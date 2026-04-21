@@ -9,6 +9,8 @@
 
 add_executable(raytracer
     main.cpp
+    math/Matrix4.cpp
+    math/Transform.cpp
 )
 
 target_include_directories(raytracer

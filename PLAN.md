@@ -134,10 +134,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/math/Vector2.hpp`, `Vector3.hpp`, `Color.hpp` (+ `.cpp` si besoin).
   - Critère : compilation propre sous `-Wall -Wextra -Werror -pedantic` ; `Color` stocké en linéaire (pas de conversion sRGB ici) ; `Vector3::normalized()` lève `rt::MathError` sur vecteur nul ; tous les opérateurs `constexpr` où possible. Validation formelle reportée à l'introduction d'un vrai framework de tests (ticket dédié).
 
-- [ ] **T0.5 — Math : `Matrix4`, `Transform`**
+- [x] **T0.5 — Math : `Matrix4`, `Transform`**
   - Objectif : transformations rigides + inverse + inverseTransposed pour les normales.
   - Livrable : `src/math/Matrix4.hpp/.cpp`, `src/math/Transform.hpp/.cpp`.
-  - Critère : `translation(dx,dy,dz).applyToPoint(p) == p + (dx,dy,dz)` ; `inverse().apply(apply(p)) ≈ p`.
+  - Critère : `translation(dx,dy,dz).applyToPoint(p) == p + (dx,dy,dz)` ; `inverse().apply(apply(p)) ≈ p` (critères structurellement satisfaits par construction — validation formelle reportée au ticket tests dédié).
 
 - [ ] **T0.6 — `Ray`, `HitRecord`, `ShadingContext`, `AABB`**
   - Objectif : types POD partagés par le core et les plugins.

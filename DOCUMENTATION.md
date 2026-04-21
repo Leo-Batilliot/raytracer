@@ -17,6 +17,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.6 — 2026-04-22 — Math : Matrix4 + Transform (T0.5)](#v006--2026-04-22--math--matrix4--transform-t05)
     - [v0.0.5 — 2026-04-22 — Math : Vector2, Vector3, Color (T0.4)](#v005--2026-04-22--math--vector2-vector3-color-t04)
     - [v0.0.4 — 2026-04-21 — Hiérarchie d'exceptions du domaine (T0.3.1)](#v004--2026-04-21--hiérarchie-dexceptions-du-domaine-t031)
     - [v0.0.3 — 2026-04-21 — CLI conforme Epitech (T0.3)](#v003--2026-04-21--cli-conforme-epitech-t03)
@@ -90,6 +91,92 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.6 — 2026-04-22 — Math : Matrix4 + Transform (T0.5)
+
+**Type** : feature
+**Ticket** : T0.5
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Introduction de `rt::Matrix4` (matrice 4x4 row-major, `double`) et `rt::Transform` (wrapper qui cache la matrice + son inverse pré-calculé). Factories analytiques pour les transformations usuelles (translation, scaling, rotations autour des axes), inverse numérique général via Gauss-Jordan avec pivot partiel, et application correcte aux normales via `(M⁻¹)ᵀ`.
+
+**Contexte / motivation**
+Les primitives du raytracer seront définies en **espace objet canonique** (sphère unité, plan Z=0, etc.) et positionnées dans la scène via un `Transform`. Chaque intersection rayon/primitive demande donc de transformer le rayon en espace objet (multiplication par l'inverse du Transform) — une opération appelée des millions de fois par frame. Conséquences architecturales :
+- **Il faut pré-calculer l'inverse** : recalculer une Gauss-Jordan dans la boucle de rendu serait catastrophique.
+- **Il faut gérer correctement les normales** : sous un scale non uniforme, les normales ne transforment PAS comme les directions ; la règle correcte est `n' = (M⁻¹)ᵀ · n`. Avoir l'inverse déjà en mémoire rend `applyToNormal()` gratuit.
+- **Les factories doivent construire l'inverse analytiquement** quand on le connaît (translation → négation, rotation → transposée, scaling → reciproque) : c'est plus rapide ET plus précis que d'inverser numériquement.
+
+Le ticket prépare également T4.4 (bonus "transformation matrix" = 2 pts) et T4.5 (scene graph = 2 pts) : ces deux bonus sont désormais **structurellement acquis**, il ne restera qu'à les documenter/exposer.
+
+**Détails techniques**
+
+- **`src/math/Matrix4.hpp`** — classe 4x4 row-major.
+  - Stockage : `std::array<double, 16>` (flat, contigu, cache-friendly ; row-major → élément `(r,c)` à `r*4+c`).
+  - **Default constructor → identité** (convention PBRT / GLM ; neutre pour la multiplication).
+  - Constructeur explicite 16 valeurs (row-major).
+  - Accès par `operator()(row, col)` (lecture + écriture).
+  - Factories `constexpr` : `identity()`, `translation(dx,dy,dz)`, `scaling(sx,sy,sz)`. Rotations non-`constexpr` (std::cos/sin ne le sont pas en C++20 ; ce sera résolu en C++23).
+  - Opérations `constexpr` : `operator*` (multiplication triple boucle), `transposed()`, `operator==` (défaultée, bit-exact), `applyToPoint` (w=1, ligne translation incluse), `applyToDirection` (w=0, ligne translation ignorée).
+  - `inverse()` → implémentation dans `.cpp`, lève `rt::MathError` si singulière.
+- **`src/math/Matrix4.cpp`** — `inverse()` via Gauss-Jordan avec pivot partiel :
+  - Matrice augmentée `[A | I]` de 4×8, réduite en `[I | A⁻¹]`.
+  - **Pivot partiel** : à chaque colonne, on échange la ligne courante avec celle ayant le plus grand `|a[r][col]|` → stabilité numérique sur les scales extrêmes.
+  - Seuil de singularité `kSingularityThreshold = 1e-12` (bien au-dessus de l'epsilon double pour rejeter les matrices dégénérées au lieu de produire du garbage).
+  - Lève `rt::MathError("Matrix4::inverse(): matrix is singular")` → cohérent avec la frontière d'erreurs posée en T0.3.1.
+- **`src/math/Transform.hpp`** — wrapper tenant **matrice + inverse cachée**.
+  - Default constructor → identité (les deux membres par défaut = identité).
+  - Constructeur explicite `Transform(const Matrix4&)` : calcule l'inverse via `Matrix4::inverse()` (peut lever `MathError`).
+  - Constructeur **direct** `Transform(matrix, inverse)` : pas de vérification (le caller s'engage que `matrix * inverse == I`). C'est ce qu'utilisent les factories analytiques.
+  - Factories analytiques :
+    - `translation(dx,dy,dz)` → inverse = translation(-dx,-dy,-dz).
+    - `scaling(sx,sy,sz)` → lève `MathError` sur 0 ; inverse = scaling(1/sx, 1/sy, 1/sz).
+    - `rotationX|Y|Z(θ)` → inverse = rotationX|Y|Z(-θ) (les rotations sont orthogonales : inverse == transposée).
+  - Application : `applyToPoint`, `applyToDirection` délèguent à la matrice ; `applyToNormal` utilise la 3x3 supérieure-gauche de l'inverse, transposée implicitement (accès `inv(k, i)` au lieu de `inv(i, k)`). **Ne renormalise pas** — décision du caller (économie de sqrt quand pas nécessaire).
+  - `operator*` (composition) : `this * other` = "appliquer `other` d'abord, puis `this`" (convention math classique). Inverse du résultat = `other.inverse_ * inverse_` (ordre inverse).
+  - `inverse()` : **zéro FLOP** — juste un échange des deux membres stockés.
+- **`src/math/Transform.cpp`** — implémentations des factories ci-dessus.
+- **`src/CMakeLists.txt`** — ajout de `math/Matrix4.cpp` et `math/Transform.cpp` à la cible `raytracer`.
+- **Aucune modification de `main.cpp`** : les types math ne sont pas (encore) consommés par le pipeline, leur utilisation commencera en T0.6 (`Ray`) et T0.13 (`Camera`).
+
+**Alternatives rejetées**
+- **Ne stocker que la matrice, recalculer l'inverse à chaque usage** : rédhibitoire en perf (des millions de Gauss-Jordan par frame). La mémoire supplémentaire (128 octets par Transform) est négligeable face au gain CPU.
+- **Utiliser la formule analytique 4x4 des cofacteurs** (style GLM `inverse()`) : ~300 lignes unrolled, plus rapide sur le papier, mais `inverse()` n'est sur aucun hot path (appelé uniquement en construction de Transform). Gauss-Jordan est 50 lignes, lisible, numériquement robuste.
+- **Pas de pivot partiel (Gauss-Jordan naïf)** : instable numériquement dès qu'une ligne a un `a[col][col]` proche de zéro alors qu'une autre ligne offre un meilleur pivot. 10 lignes de plus pour une robustesse critique.
+- **`std::array<std::array<double, 4>, 4>` au lieu de flat `std::array<double, 16>`** : même taille mémoire (les compilateurs déplient), mais moins intuitif pour l'ordre row-major et casse certaines optimisations vectorielles. Le flat + `operator()` est la convention des libs modernes.
+- **Stocker column-major (convention OpenGL)** : pas de raison pour un raytracer CPU ; row-major est plus intuitif dans du code C++ et matche la notation mathématique standard.
+- **Factoriser `Transform` en abstraction polymorphe** (`class ITransform`) : Transform est un **value type**, pas une entité polymorphe. Comme pour Vector3, une interface virtuelle ici = 100 % coût, 0 % bénéfice (cf. discussion T0.4).
+- **Perspective divide dans `applyToPoint`** : on ne fait pas de projection perspective via Matrix4 pour l'instant. Quand ce sera nécessaire (si on ajoute un bonus de type caméra orthographique avec vraie projection 4D), ce helper sera revisité. Pour le pinhole actuel (T0.13), la projection se fait directement dans `Camera::generateRay()`.
+- **Normaliser automatiquement dans `applyToNormal`** : couteux (sqrt) et pas toujours souhaité (certains algos travaillent avec la longueur). Le caller décide.
+- **Lever `MathError` dès la construction d'un scaling(0,…)** : choix cohérent avec la frontière d'erreurs posée en T0.3.1 — le scaling singulier ne peut pas être représenté comme Transform car son inverse n'existe pas.
+- **Sanity check / assertions embarquées** : non (politique validée le 2026-04-22). La validation automatique des critères d'acceptation viendra avec le framework de tests.
+
+**Impact**
+- **T0.6** (`Ray`, `HitRecord`) : le type `Transform` est disponible pour transformer rayons et normales entre espace monde et espace objet.
+- **T0.13** (`Camera`) : la caméra pinhole utilisera `Transform` pour sa position + orientation dans le monde.
+- **T1.x** (primitives) : chaque primitive portera un `Transform` et intersectera en espace objet canonique. Le bonus "transformation matrix" (T4.4, 2 pts) est **acquis** dès que ces primitives l'utilisent.
+- **T4.5** (scene graph) : `INode` composite pourra composer des `Transform` naturellement via `operator*`. Bonus acquis structurellement.
+- **Dette technique** : aucune. Les APIs sont stables, les responsabilités bien séparées (Matrix4 = pure math, Transform = politique de cache + erreurs).
+
+**Non couvert volontairement**
+- **`AABB`** (bounding box) → T0.6.
+- **Projection perspective** dans `applyToPoint` (w != 1) → éventuel bonus caméra avancée.
+- **Transformations Scale/Shear bonus** (T4.14) : la matrice supporte déjà le shear via construction manuelle ; il restera à exposer une factory dédiée et à l'accepter dans le parser.
+- **Quaternions** pour les rotations : les rotations autour des axes X/Y/Z suffisent pour le sujet et l'ensemble des bonus de rotation. Un ajout quaternion serait du refactor inutile.
+- **Validation automatique** (critères PLAN.md `translation(d).applyToPoint(p) == p + d` et `inverse().apply(apply(p)) ≈ p`) : les critères sont satisfaits **par construction** (les factories sont analytiques, pas numériques), et la validation formelle sera faite via GoogleTest + CTest quand le ticket framework sera ouvert.
+
+**Validation**
+```bash
+make re                               # rebuild Release, 0 warning
+make debug                            # rebuild Debug (ASan+UBSan), 0 warning
+./raytracer --help; echo $?           # exit 0 — CLI intact
+./raytracer; echo $?                  # exit 84 — CliError intact
+./raytracer nope.cfg; echo $?         # exit 84 — IOError intact
+ldd ./raytracer | grep raytracer_     # vide → aucun plugin linké
+```
+Les types math compilent proprement sous `-Wall -Wextra -Werror -pedantic` (Release + Debug+sanitizers). Aucune régression sur la CLI. Les critères du ticket sont satisfaits par construction (factories analytiques, inverse cachée), validation formelle reportée.
+
+---
 
 ### v0.0.5 — 2026-04-22 — Math : Vector2, Vector3, Color (T0.4)
 
@@ -442,6 +529,8 @@ En réserve bonus : Observer (hot-reload), Decorator (empilement d'effets sur ma
 - **Base vectorielle** : main droite. `ex.cross(ey) == ez` (vérifié par `math_sanity_check()`).
 - **Exceptions math aux frontières** : `normalized()` lève `rt::MathError` sur vecteur nul. Les hot paths (`intersect`, `shade`, boucle de tuiles) doivent vérifier `lengthSquared() > 0` manuellement plutôt que d'attraper une exception.
 - **Validation runtime** : aucune validation automatique embarquée dans le code. Les tests manuels introduits en v0.0.5 (`src/math/sanity.hpp`) ont été retirés : la validation formelle passera par GoogleTest + CTest dans un ticket dédié, pas par des asserts ad-hoc dans le source.
+- **Matrices** : `Matrix4` row-major, stockée flat en `std::array<double, 16>`, default = identité. Accès par `M(row, col)`. Multiplication, transposée, inversion (Gauss-Jordan + pivot partiel, lève `MathError` sur singulière).
+- **Transform** : tient matrice + **inverse pré-calculé**. Factories analytiques (`translation`/`scaling`/`rotation*`) construisent l'inverse exactement (négation, réciproque, transposée) ; le constructeur générique `Transform(Matrix4)` appelle `Matrix4::inverse()` numérique. `applyToNormal` utilise `(M⁻¹)ᵀ` pour gérer correctement les scales non uniformes. `Transform::inverse()` est gratuit (swap des deux matrices stockées).
 
 ---
 
