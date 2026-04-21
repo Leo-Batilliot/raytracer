@@ -17,6 +17,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.5 — 2026-04-22 — Math : Vector2, Vector3, Color (T0.4)](#v005--2026-04-22--math--vector2-vector3-color-t04)
     - [v0.0.4 — 2026-04-21 — Hiérarchie d'exceptions du domaine (T0.3.1)](#v004--2026-04-21--hiérarchie-dexceptions-du-domaine-t031)
     - [v0.0.3 — 2026-04-21 — CLI conforme Epitech (T0.3)](#v003--2026-04-21--cli-conforme-epitech-t03)
     - [v0.0.2 — 2026-04-21 — Squelette CMake + Makefile wrapper (T0.2)](#v002--2026-04-21--squelette-cmake--makefile-wrapper-t02)
@@ -25,6 +26,7 @@
     - [Design patterns retenus (v0.0.1)](#design-patterns-retenus-v001)
     - [Choix techniques clés (v0.0.1)](#choix-techniques-clés-v001)
     - [Gestion d'erreurs (v0.0.4)](#gestion-derreurs-v004)
+    - [Math : conventions (v0.0.5)](#math--conventions-v005)
   - [Features documentées](#features-documentées)
     - [Primitives](#primitives)
     - [Lumières](#lumières)
@@ -88,6 +90,76 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.5 — 2026-04-22 — Math : Vector2, Vector3, Color (T0.4)
+
+**Type** : feature
+**Ticket** : T0.4
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Introduction des briques mathématiques de base du raytracer : `rt::Vector2` (UV / espace écran), `rt::Vector3` (points, directions, normales en double précision) et `rt::Color` (RGB flottant en espace linéaire). Toutes les opérations usuelles sont fournies en `constexpr` où possible.
+
+> **Patch 2026-04-22** : le header `src/math/sanity.hpp` et l'appel `rt::math_sanity_check()` depuis `main()` ont été supprimés juste après la validation du ticket. Décision : pas de tests ad-hoc dans le code de prod — la validation formelle des types math sera faite plus tard via un vrai framework (GoogleTest + CTest, ticket dédié). Voir la section "Patches / bug fixes" ci-dessous.
+
+**Contexte / motivation**
+Avant d'attaquer `Matrix4`/`Transform` (T0.5), `Ray`/`HitRecord` (T0.6) et les interfaces (T0.7), on pose les types numériques fondamentaux. Contraintes verrouillées en Phase 0 :
+- `Vector3` en **double** : précision nécessaire pour de longues chaînes de transformations et d'intersections ; les erreurs s'accumulent vite en float sur de gros vecteurs de scène.
+- `Color` en **float linéaire** : la conversion sRGB + clamp se fait **exclusivement** à l'écriture PPM (T0.12). Stocker en linéaire permet l'empilement HDR (réflexion, lumières multiples, Phong) sans quantification prématurée.
+- **Immuabilité** : tous les opérateurs retournent une nouvelle valeur. Aucun `+=`/`-=` exposé pour éviter les mutations silencieuses (cf. `rules/common/coding-style.md`).
+- **Exceptions aux frontières uniquement** : `normalized()` lève `rt::MathError` sur vecteur nul — acceptable car les normalisations de scène (camera.up, direction de lumière) se font à la construction, pas dans la boucle de rendu. Les hot-paths devront vérifier `lengthSquared() > 0` eux-mêmes.
+
+**Détails techniques**
+- **`src/math/Vector2.hpp`** — POD double x, y.
+  - Opérateurs : `+`, `-`, `-unary`, `*double`, `/double`, `==` (`= default`).
+  - Multiplication scalaire symétrique : `double * Vector2` via `operator*` libre.
+  - `dot`, `lengthSquared`, `length`, `normalized()` (lève `MathError` sur longueur nulle).
+  - Tout est `constexpr` sauf `length()` et `normalized()` (dépendent de `std::sqrt`).
+- **`src/math/Vector3.hpp`** — POD double x, y, z.
+  - Même surface que Vector2, plus `cross()` (convention main droite : ex×ey=ez).
+  - `normalized()` lève `rt::MathError` — ce qui justifie a posteriori le raffinement `MathError` introduit en T0.3.1.
+- **`src/math/Color.hpp`** — POD float r, g, b.
+  - Constructeurs + factories `Color::black()`, `Color::white()` (`static constexpr`).
+  - Opérateurs : `+`, `-` (accumulation additive), `*float` / `/float` (intensité), `*Color` (produit **composante par composante** = albedo de surface × radiance incidente).
+  - Comparaison `==` défaultée.
+  - **Pas de clamp, pas de conversion sRGB ici** : c'est le rôle de `PPMWriter` (T0.12). Les valeurs > 1.0 sont légales (HDR).
+- **Aucun `.cpp`** ajouté : tout est header-only (inline / constexpr). Pas de nouvelle cible CMake ; `target_include_directories(raytracer PRIVATE src/)` existant suffit.
+- **Validation** : aucune suite de tests embarquée dans le code. La validation formelle des types math passera par un vrai framework (GoogleTest + CTest) dans un ticket dédié, jamais par des asserts manuels dans le source.
+
+**Alternatives rejetées**
+- **Stocker `Vector3` en `float`** : gain mémoire marginal, perte de précision critique sur des scènes avec des grandes échelles (e.g. coordonnées astronomiques de bonus exotiques). La plupart des raytracers de référence (PBRT, Mitsuba) utilisent double pour la géométrie.
+- **Templater `Vector<T, N>` ou dériver de `std::array`** : sur-ingénierie pour deux types (Vector2, Vector3). Les signatures explicites sont plus lisibles, le compilateur optimise de toute façon.
+- **Ajouter `operator+=`, `-=`, `*=`, `/=`** : violent l'immuabilité imposée par les règles du projet. Les renderers alloueront des `const Vector3` intermédiaires ; la RVO gère la perf.
+- **Ajouter un `epsilon()` par défaut dans `operator==`** : risqué. Le `==` défaultée est strict (bit-exact) → prédictible. Les comparaisons approximées se font via `approx(a, b, eps)` explicites dans la logique métier.
+- **`Color` en 4 canaux (RGBA)** : l'alpha n'est pas au programme du sujet, et le pipeline Epitech est opaque. Ajouter A serait une dette non justifiée.
+- **`Color::clamped()` / `Color::toSRGB8()`** : hors scope T0.4. Ces conversions vivront dans `PPMWriter` (T0.12) où leur contexte est clair (formats de pixel, endianness).
+- **Asserts manuels dans le code de prod** (`math_sanity_check()`-style) : prototypé dans une version intermédiaire puis **retiré** — pas de tests ad-hoc dans le source. La validation automatique passera par GoogleTest + CTest dans un ticket dédié.
+- **Lever une exception dans les hot paths** : catégoriquement non. `normalized()` lève car appelé aux frontières (construction de la camera, parsing) ; les boucles de tuiles/rayons doivent éviter `normalized()` sur un vecteur potentiellement nul ou le gérer manuellement.
+
+**Impact**
+- T0.5 (`Matrix4`, `Transform`) peut désormais composer des opérations sur Vector3 directement.
+- T0.6 (`Ray`, `HitRecord`, `ShadingContext`) réutilise Vector2/Vector3/Color sans adaptation.
+- T0.12 (`PPMWriter`) aura le type `Color` en linéaire prêt à être converti en sRGB + clampé → octets.
+- **Dette technique** : pas de validation automatique pour l'instant. Le ticket dédié GoogleTest + CTest (à planifier) couvrira les types math + core.
+
+**Non couvert volontairement**
+- `Matrix4` / `Transform` → T0.5 (ticket séparé).
+- `AABB`, `Ray`, `HitRecord` → T0.6.
+- Clamp / conversion sRGB / PPM → T0.12.
+- Tests unitaires formalisés (GoogleTest + CTest) → sera introduit quand la surface math + core le justifie.
+- Quaternions / rotations Euler → hors scope sujet, éventuellement en bonus Phase 4.
+
+**Validation**
+```bash
+make re                               # rebuild Release, 0 warning
+./raytracer --help; echo $?           # exit 0
+./raytracer; echo $?                  # exit 84 (CliError)
+./raytracer nope.cfg; echo $?         # exit 84 (IOError)
+ldd ./raytracer | grep raytracer_     # vide → aucun plugin linké
+```
+Tous les checks passent. Les types math compilent proprement sous `-Wall -Wextra -Werror -pedantic`, `Vector3::normalized()` lève bien `rt::MathError` sur vecteur nul (contrat vérifiable manuellement en attendant le ticket tests). Aucune validation automatique embarquée dans le code — c'est un choix explicite (voir patch 2026-04-22).
+
+---
 
 ### v0.0.4 — 2026-04-21 — Hiérarchie d'exceptions du domaine (T0.3.1)
 
@@ -362,6 +434,15 @@ En réserve bonus : Observer (hot-reload), Decorator (empilement d'effets sur ma
 - **Unique `try/catch` dans `main()`** : traduit chaque catégorie en exit 84 + message `stderr`. Un `catch (const std::exception&)` de dernier recours évite `std::terminate` sur toute erreur inattendue.
 - **Frontière plugin** : les exceptions **ne traversent pas** `extern "C"` ; chaque plugin capture en interne et renvoie un code d'erreur que le core reconvertit en `PluginError`. Câblage à faire en T0.9 / T0.15.
 
+### Math : conventions (v0.0.5)
+
+- **Précision** : `Vector2` / `Vector3` stockent en `double` (précision géométrique sur scènes à grande échelle). `Color` stocke en `float` (RGB linéaire, HDR autorisé > 1.0).
+- **Espace colorimétrique** : toute la math colorimétrique (éclairage, réflexion, atténuation) se fait en **linéaire**. La conversion sRGB + clamp est réservée à `PPMWriter` (T0.12).
+- **Immuabilité** : tous les opérateurs renvoient de nouveaux objets. Aucun compound assignment (`+=`, `-=`, `*=`, `/=`) exposé — les règles du projet interdisent la mutation.
+- **Base vectorielle** : main droite. `ex.cross(ey) == ez` (vérifié par `math_sanity_check()`).
+- **Exceptions math aux frontières** : `normalized()` lève `rt::MathError` sur vecteur nul. Les hot paths (`intersect`, `shade`, boucle de tuiles) doivent vérifier `lengthSquared() > 0` manuellement plutôt que d'attraper une exception.
+- **Validation runtime** : aucune validation automatique embarquée dans le code. Les tests manuels introduits en v0.0.5 (`src/math/sanity.hpp`) ont été retirés : la validation formelle passera par GoogleTest + CTest dans un ticket dédié, pas par des asserts ad-hoc dans le source.
+
 ---
 
 ## Features documentées
@@ -391,6 +472,29 @@ _Aucun bonus implémenté pour l'instant._
 ---
 
 ## Patches / bug fixes
+
+### 2026-04-22 — Suppression de `math_sanity_check()` et de `src/math/sanity.hpp`
+
+**Fichiers** : `src/math/sanity.hpp` (supprimé), `src/main.cpp` (include + appel retirés)
+**Type** : refactor / DX
+
+**Problème**
+Le ticket T0.4 avait introduit `rt::math_sanity_check()` dans `src/math/sanity.hpp` pour valider à la volée Vector2, Vector3, Color via des `assert()` appelés depuis `main()` en Debug. Ces checks « à la main » pollueraient le code de prod et ne remplacent pas un vrai framework de tests.
+
+**Fix**
+- Suppression de `src/math/sanity.hpp`.
+- `#include "math/sanity.hpp"` et appel `rt::math_sanity_check()` retirés de `src/main.cpp`.
+- Critère d'acceptation de T0.4 dans `PLAN.md` reformulé : compilation `-Wall -Wextra -Werror -pedantic` propre + contraintes structurelles (linéaire, `MathError` sur vecteur nul, `constexpr` où possible). Validation formelle reportée à l'introduction d'un vrai framework.
+
+**Politique retenue**
+Pas de tests ad-hoc dans le code de prod. Quand une validation automatique sera nécessaire, elle passera par GoogleTest + CTest dans un ticket dédié (dossier `tests/`, cible CMake séparée, lancée via `ctest`).
+
+**Résultat**
+- `src/math/` ne contient plus que `Vector2.hpp`, `Vector3.hpp`, `Color.hpp` (+ `.gitkeep`).
+- `main.cpp` revient à sa forme post-T0.3.1 : un `try/catch` qui n'exécute rien avant `parseArguments()`.
+- Build Release : OK, 0 warning. Tous les exits / chemins CLI inchangés.
+
+---
 
 ### 2026-04-21 — Suppression du bruit `gmake[N]: Entering/Leaving directory`
 

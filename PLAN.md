@@ -129,10 +129,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/core/Exceptions.hpp`, refactor de `src/main.cpp` pour lancer `CliError` / `IOError` et capturer via un seul `try/catch` avec branches polymorphes.
   - Critère : comportement CLI strictement identique à T0.3 (exits / stdout / stderr) ; la plomberie d'erreurs est disponible pour tous les modules à venir (math, parser, plugin loader).
 
-- [ ] **T0.4 — Math : `Vector2`, `Vector3`, `Color`**
+- [x] **T0.4 — Math : `Vector2`, `Vector3`, `Color`**
   - Objectif : briques mathématiques soignées (opérateurs, dot, cross, normalize, length, conversions).
   - Livrable : `src/math/Vector2.hpp`, `Vector3.hpp`, `Color.hpp` (+ `.cpp` si besoin).
-  - Critère : un `math_sanity_check()` appelable (asserts runtime) passe ; `Color` stocké en linéaire.
+  - Critère : compilation propre sous `-Wall -Wextra -Werror -pedantic` ; `Color` stocké en linéaire (pas de conversion sRGB ici) ; `Vector3::normalized()` lève `rt::MathError` sur vecteur nul ; tous les opérateurs `constexpr` où possible. Validation formelle reportée à l'introduction d'un vrai framework de tests (ticket dédié).
 
 - [ ] **T0.5 — Math : `Matrix4`, `Transform`**
   - Objectif : transformations rigides + inverse + inverseTransposed pour les normales.
