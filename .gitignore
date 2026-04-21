@@ -1,0 +1,30 @@
+# === Build system ===
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+
+# === Binaires du projet ===
+/raytracer
+/plugins/*.so
+/plugins/*.dylib
+/plugins/*.dll
+
+# === Artefacts C / C++ ===
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# === Rendus PPM générés (on garde uniquement ceux de screenshots/) ===
+*.ppm
+!screenshots/*.ppm
+
+# === IDE / éditeurs ===
+.vscode/
