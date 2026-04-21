@@ -17,10 +17,14 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.4 — 2026-04-21 — Hiérarchie d'exceptions du domaine (T0.3.1)](#v004--2026-04-21--hiérarchie-dexceptions-du-domaine-t031)
+    - [v0.0.3 — 2026-04-21 — CLI conforme Epitech (T0.3)](#v003--2026-04-21--cli-conforme-epitech-t03)
+    - [v0.0.2 — 2026-04-21 — Squelette CMake + Makefile wrapper (T0.2)](#v002--2026-04-21--squelette-cmake--makefile-wrapper-t02)
     - [v0.0.1 — 2026-04-21 — Initialisation du dépôt (T0.1)](#v001--2026-04-21--initialisation-du-dépôt-t01)
   - [Architecture \& choix techniques](#architecture--choix-techniques)
     - [Design patterns retenus (v0.0.1)](#design-patterns-retenus-v001)
     - [Choix techniques clés (v0.0.1)](#choix-techniques-clés-v001)
+    - [Gestion d'erreurs (v0.0.4)](#gestion-derreurs-v004)
   - [Features documentées](#features-documentées)
     - [Primitives](#primitives)
     - [Lumières](#lumières)
@@ -84,6 +88,84 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.4 — 2026-04-21 — Hiérarchie d'exceptions du domaine (T0.3.1)
+
+**Type** : refactor
+**Ticket** : T0.3.1
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Introduction d'une hiérarchie d'exceptions personnalisées (`rt::RaytracerException` et ses sous-classes) et refactor de `main.cpp` pour que toute erreur du domaine remonte à un unique `try/catch` dans `main()`. Plus de `if (error) return 84;` disséminés : chaque module du projet à venir lancera une exception typée, `main()` la traduira en exit 84 + message sur `stderr`.
+
+**Contexte / motivation**
+À la fin de T0.3, la gestion d'erreur CLI fonctionnait mais reposait sur un helper `fail()` qui écrivait sur `stderr` puis retournait 84. Ce schéma ne passe pas à l'échelle : dès T0.4+ (math), T0.9 (plugin loader) et T0.10 (parser), chaque module aurait dû propager son erreur manuellement (code de retour, `std::optional`, `std::expected`). En C++ idiomatique, ce rôle revient aux exceptions ; elles offrent en plus :
+- **catégorisation claire** : un `PluginAbiError` ≠ un `SceneParseError` ≠ une `CliError` ; `main()` (ou un futur observateur) peut réagir différemment sans sniffer le message.
+- **contexte riche** : chaque exception porte son propre `what()` (chemin du fichier, ligne libconfig, nom du plugin, ABI attendue vs trouvée…).
+- **polymorphisme** : un seul `catch (const rt::RaytracerException&)` attrape tout le domaine métier, et des `catch` plus spécifiques peuvent être ajoutés sans toucher aux lanceurs.
+- **sécurité** : un `std::exception` inattendu ne remonterait plus à `std::terminate` — un filet de dernier recours exit 84 proprement.
+
+La décision a été actée en passation : "T0.3bis / v0.0.4 — on pose la plomberie d'erreurs maintenant, avant T0.4, pour que les classes math (ex: `Vector3::normalize()` sur vecteur nul) puissent jeter `MathError` proprement dès leur écriture."
+
+**Détails techniques**
+- **Nouveau fichier** : `src/core/Exceptions.hpp`.
+  - Racine : `rt::RaytracerException : public std::runtime_error` — hérite de la stdlib pour bénéficier de `what()` + ergonomie des constructeurs (`using std::runtime_error::runtime_error;`).
+  - Catégories (toutes réutilisant les constructeurs parents via `using`) :
+    - `CliError` — argv invalide (manque argument, trop d'arguments, flag inconnu).
+    - `IOError` — fichier inexistant / pas régulier / illisible.
+    - `SceneParseError` (base) avec deux raffinements :
+      - `InvalidConfigError` — syntaxe / type / valeur hors bornes libconfig.
+      - `UnknownTypeError` — scène référence un nom non fourni par un plugin chargé.
+    - `PluginError` (base) avec deux raffinements :
+      - `PluginLoadError` — `dlopen`/`dlsym` échoue, `.so` absent.
+      - `PluginAbiError` — `RAYTRACER_ABI_VERSION` incompatible.
+    - `MathError` — `Vector3::normalize()` vecteur nul, matrice singulière, composition invalide.
+  - Header-only, pas de `.cpp` (tout est `inline` via héritage et constructeurs délégués).
+  - Namespace `rt::` choisi pour toutes les classes publiques du projet (court, dédié, pas de collision avec `std::`).
+- **`src/main.cpp` refactoré** :
+  - Ancien helper `fail()` supprimé.
+  - Nouvelle fonction `validateScenePath()` : lève `rt::IOError` plutôt que retourner un code.
+  - Nouvelle fonction `parseArguments()` : lève `rt::CliError` pour toute erreur d'argv ; renvoie un `std::filesystem::path` vide comme sentinel "`--help` déjà géré, exit 0".
+  - `runScene()` devient `void` (ne peut plus échouer par code de retour).
+  - `main()` : unique `try { … } catch` avec 3 branches polymorphes :
+    - `rt::CliError` → message sur `stderr` **+ usage** + exit 84 (un CLI invalide mérite l'usage).
+    - `rt::RaytracerException` → message sur `stderr` + exit 84 (pas d'usage pour une erreur IO/parse/plugin/math).
+    - `std::exception` → filet de dernier recours : "unexpected error: …" + exit 84, jamais `std::terminate`.
+  - `#include "core/Exceptions.hpp"` ajouté (chemin relatif au `target_include_directories(PRIVATE src/)` existant).
+
+**Alternatives rejetées**
+- **Rester en codes de retour (`int fail(msg)`)** : ne passe pas à l'échelle sur N modules ; impose de re-propager manuellement à chaque niveau. Anti-idiomatique en C++ moderne où RAII + exceptions = modèle standard aux frontières.
+- **`std::expected<T, ErrorCategory>` (C++23)** : toolchain sujet garantit C++20 uniquement. Aussi : `expected` est mieux adapté aux retours métier (intersect, shade) qu'aux erreurs catastrophiques de démarrage. On en gardera l'idée pour les retours de hot-path plus tard.
+- **Une seule classe `RaytracerException` sans sous-classes** : fonctionnel mais on perd la catégorisation. `e.what()` deviendrait la seule info typée, ce qui obligerait à parser des chaînes pour réagir.
+- **Faire hériter directement de `std::exception`** : priverait des constructeurs `(const std::string&)` et `(const char*)` de `std::runtime_error`. Zéro bénéfice, verbosité accrue.
+- **Exceptions dans les hot paths (`IPrimitive::intersect`, `IMaterial::shade`)** : catégoriquement non. Les exceptions C++ ont un coût non trivial sur le chemin levé ; sur une boucle de millions de rayons, c'est inacceptable. Les hot paths restent en valeur de retour (`bool`, `std::optional<HitRecord>`).
+- **Laisser les exceptions traverser l'ABI plugin (`.so`)** : interdit — une exception ne peut pas traverser la frontière `extern "C"` en toute sécurité (linker différent, ABI divergente). Les plugins devront capturer en interne et retourner un code d'erreur que le core reconvertit en exception. Ce point sera câblé en T0.9 / T0.15.
+
+**Impact**
+- Dès T0.4 (math), les classes `Vector3`, `Matrix4`, `Transform` peuvent lever `rt::MathError` naturellement.
+- T0.9 (PluginLoader) aura `PluginLoadError` et `PluginAbiError` prêts à l'emploi.
+- T0.10 (SceneParser) aura `InvalidConfigError` et `UnknownTypeError` prêts à l'emploi.
+- Le code de `main()` devient stable : toute nouvelle source d'erreur s'intègre sans modifier `main()` (ouvert à l'extension, fermé à la modification).
+- **Filet de sécurité** : un `std::bad_alloc`, une `std::filesystem::filesystem_error` non convertie, etc. ne provoquent plus `std::terminate` — exit 84 avec diagnostic.
+- **Dette technique introduite** : les plugins devront implémenter une conversion code d'erreur → exception au bord core/plugin (documenté pour T0.9). Aucun autre emprunt.
+
+**Non couvert volontairement**
+- Enrichissement des exceptions avec des **champs typés** (`.file_name()`, `.line_number()`, `.plugin_name()`) : on l'ajoutera au cas par cas quand le parser/loader les produiront (T0.9, T0.10). Aujourd'hui, le message textuel suffit.
+- Tests unitaires des exceptions : le framework de tests (GoogleTest + CTest) n'est pas encore en place ; il sera introduit en même temps que les classes math (T0.4) où le volume de code justifie une cible `test`.
+
+**Validation**
+```bash
+make re                               # rebuild clean, 0 warning
+./raytracer --help; echo $?           # usage sur stdout, exit 0
+./raytracer; echo $?                  # CliError: usage sur stderr, exit 84
+./raytracer nope.cfg; echo $?         # IOError: pas d'usage, exit 84
+./raytracer src; echo $?              # IOError (dir): pas d'usage, exit 84
+./raytracer a b c; echo $?            # CliError: usage sur stderr, exit 84
+./raytracer /tmp/valid.cfg; echo $?   # accusé de réception, exit 0
+```
+Tous les checks passent. Comportement CLI strictement identique à T0.3 (zéro régression observable de l'extérieur), mais la plomberie d'erreurs est désormais prête pour le reste du projet.
+
+---
 
 ### v0.0.3 — 2026-04-21 — CLI conforme Epitech (T0.3)
 
@@ -271,6 +353,14 @@ En réserve bonus : Observer (hot-reload), Decorator (empilement d'effets sur ma
 - **`Color` en float linéaire**, conversion sRGB uniquement à l'écriture PPM.
 - **Intersection en espace objet** (primitives canoniques).
 - **Matériaux référencés par nom, partagés via `shared_ptr`**.
+
+### Gestion d'erreurs (v0.0.4)
+
+- **Exceptions aux frontières uniquement** : CLI, parser, plugin loader, IO. Jamais dans les hot paths (`intersect`, `shade`, boucle de tuiles) — ces derniers restent en valeur de retour (`bool`, `std::optional`).
+- **Racine unique** : toutes les erreurs du domaine héritent de `rt::RaytracerException : public std::runtime_error` (voir `src/core/Exceptions.hpp`).
+- **Catégories** : `CliError`, `IOError`, `SceneParseError` (→ `InvalidConfigError`, `UnknownTypeError`), `PluginError` (→ `PluginLoadError`, `PluginAbiError`), `MathError`.
+- **Unique `try/catch` dans `main()`** : traduit chaque catégorie en exit 84 + message `stderr`. Un `catch (const std::exception&)` de dernier recours évite `std::terminate` sur toute erreur inattendue.
+- **Frontière plugin** : les exceptions **ne traversent pas** `extern "C"` ; chaque plugin capture en interne et renvoie un code d'erreur que le core reconvertit en `PluginError`. Câblage à faire en T0.9 / T0.15.
 
 ---
 

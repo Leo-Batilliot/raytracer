@@ -1,16 +1,24 @@
 // Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
 //
-// CLI entry point (ticket T0.3).
-// Responsibilities handled here:
-//   - parse argv
-//   - print usage on --help (stdout, exit 0)
-//   - report errors on stderr and exit with code 84 on any failure
-//   - delegate scene loading / rendering to future modules (T0.10+)
+// CLI entry point.
+//
+// Ticket history:
+//   - T0.3   : initial CLI (argv parsing, --help, exit 84, stderr).
+//   - T0.3.1 : refactor to use the rt::RaytracerException hierarchy so
+//              that every domain error bubbles up to a single try/catch
+//              here, and each category can be translated to an exit code
+//              + message without scattering `if (error) return 84;`.
+//
+// Boundary contract: main() is the ONLY place that catches. Every other
+// module throws a subclass of rt::RaytracerException on failure. Hot
+// paths (intersect, shade, tile loop) stay exception-free.
 
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <string_view>
+
+#include "core/Exceptions.hpp"
 
 namespace {
 
@@ -26,19 +34,49 @@ void printUsage(std::ostream& out)
     out << kUsage;
 }
 
-int fail(std::string_view message)
-{
-    std::cerr << "raytracer: " << message << '\n';
-    printUsage(std::cerr);
-    return kExitFailure;
-}
-
 bool isHelpFlag(std::string_view arg)
 {
     return arg == "--help" || arg == "-h";
 }
 
-int runScene(const std::filesystem::path& scenePath)
+std::filesystem::path validateScenePath(std::string_view arg)
+{
+    const std::filesystem::path scenePath{arg};
+
+    std::error_code ec;
+    if (!std::filesystem::exists(scenePath, ec) || ec) {
+        throw rt::IOError("scene file not found: " + std::string(arg));
+    }
+    if (!std::filesystem::is_regular_file(scenePath, ec) || ec) {
+        throw rt::IOError("scene path is not a regular file: "
+                          + std::string(arg));
+    }
+    return scenePath;
+}
+
+// Parses argv and returns the validated scene path, or std::nullopt-like
+// sentinel (empty path) when the caller already handled the arguments
+// (e.g. --help). Throws rt::CliError / rt::IOError on failure.
+std::filesystem::path parseArguments(int argc, char* argv[])
+{
+    if (argc < 2) {
+        throw rt::CliError("missing argument: a scene file is required");
+    }
+    if (argc > 2) {
+        throw rt::CliError(
+            "too many arguments: expected exactly one scene file");
+    }
+
+    const std::string_view arg = argv[1];
+    if (isHelpFlag(arg)) {
+        printUsage(std::cout);
+        return {};  // empty path signals "handled, exit success"
+    }
+
+    return validateScenePath(arg);
+}
+
+void runScene(const std::filesystem::path& scenePath)
 {
     // Ticket T0.3 scope ends here: we only confirm the file is readable.
     // The actual parser (libconfig++) lands in T0.10, and the renderer
@@ -47,36 +85,30 @@ int runScene(const std::filesystem::path& scenePath)
               << scenePath.string() << '\n'
               << "raytracer: rendering pipeline not implemented yet "
               << "(see PLAN.md, tickets T0.10+)\n";
-    return kExitSuccess;
 }
 
 }  // namespace
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2) {
-        return fail("missing argument: a scene file is required");
-    }
-    if (argc > 2) {
-        return fail("too many arguments: expected exactly one scene file");
-    }
-
-    const std::string_view arg = argv[1];
-
-    if (isHelpFlag(arg)) {
-        printUsage(std::cout);
+    try {
+        const auto scenePath = parseArguments(argc, argv);
+        if (scenePath.empty()) {
+            return kExitSuccess;  // --help path
+        }
+        runScene(scenePath);
         return kExitSuccess;
+    } catch (const rt::CliError& e) {
+        std::cerr << "raytracer: " << e.what() << '\n';
+        printUsage(std::cerr);
+        return kExitFailure;
+    } catch (const rt::RaytracerException& e) {
+        std::cerr << "raytracer: " << e.what() << '\n';
+        return kExitFailure;
+    } catch (const std::exception& e) {
+        // Last-resort safety net: any non-domain std::exception still
+        // yields exit 84 with a diagnostic, never std::terminate.
+        std::cerr << "raytracer: unexpected error: " << e.what() << '\n';
+        return kExitFailure;
     }
-
-    const std::filesystem::path scenePath{arg};
-
-    std::error_code ec;
-    if (!std::filesystem::exists(scenePath, ec) || ec) {
-        return fail("scene file not found: " + std::string(arg));
-    }
-    if (!std::filesystem::is_regular_file(scenePath, ec) || ec) {
-        return fail("scene path is not a regular file: " + std::string(arg));
-    }
-
-    return runScene(scenePath);
 }

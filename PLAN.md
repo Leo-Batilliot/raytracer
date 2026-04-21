@@ -124,6 +124,11 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/main.cpp`.
   - Critère : `./raytracer --help` affiche l'usage exact du sujet (exit 0) ; `./raytracer` seul → 84 + message stderr ; `./raytracer nope.cfg` → 84 + message stderr.
 
+- [x] **T0.3.1 — Hiérarchie d'exceptions du domaine**
+  - Objectif : introduire `rt::RaytracerException` + sous-classes (`CliError`, `IOError`, `SceneParseError` / `InvalidConfigError` / `UnknownTypeError`, `PluginError` / `PluginLoadError` / `PluginAbiError`, `MathError`) pour que tout le code métier lance, et qu'un unique `try/catch` dans `main()` traduise en exit 84 + message `stderr`.
+  - Livrable : `src/core/Exceptions.hpp`, refactor de `src/main.cpp` pour lancer `CliError` / `IOError` et capturer via un seul `try/catch` avec branches polymorphes.
+  - Critère : comportement CLI strictement identique à T0.3 (exits / stdout / stderr) ; la plomberie d'erreurs est disponible pour tous les modules à venir (math, parser, plugin loader).
+
 - [ ] **T0.4 — Math : `Vector2`, `Vector3`, `Color`**
   - Objectif : briques mathématiques soignées (opérateurs, dot, cross, normalize, length, conversions).
   - Livrable : `src/math/Vector2.hpp`, `Vector3.hpp`, `Color.hpp` (+ `.cpp` si besoin).
