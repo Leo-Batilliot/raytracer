@@ -114,7 +114,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : arborescence vide cohérente avec le projet cible, `.gitignore`, `README.md`, `plan.md` et `DOCUMENTATION.md` créés.
   - Critère : `git status` propre après premier commit ; aucun binaire / fichier généré tracké.
 
-- [ ] **T0.2 — Squelette CMake + Makefile wrapper**
+- [x] **T0.2 — Squelette CMake + Makefile wrapper**
   - Objectif : build système fonctionnel, binaire vide à la racine, flags Debug/Release, sorties aux bons endroits.
   - Livrable : `CMakeLists.txt` racine + `src/CMakeLists.txt` + `plugins/CMakeLists.txt` + `Makefile` wrapper.
   - Critère : `make` produit `./raytracer` (main qui retourne 0), `make re` / `make fclean` fonctionnent, `./raytracer` ne produit aucun output et retourne 0.

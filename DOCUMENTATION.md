@@ -85,6 +85,71 @@ Exemples :
 
 ## Changelog
 
+### v0.0.2 — 2026-04-21 — Squelette CMake + Makefile wrapper (T0.2)
+
+**Type** : infra
+**Ticket** : T0.2
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Mise en place du build system : `CMakeLists.txt` racine, sous-projets `src/` et `plugins/`, `Makefile` wrapper. Le binaire `raytracer` est désormais produit à la racine, vide mais fonctionnel (retourne 0).
+
+**Contexte / motivation**
+Avant d'écrire le moindre code moteur, on a besoin d'un build system déterministe qui respecte les contraintes Epitech :
+- binaire `./raytracer` à la racine (pas dans `build/`),
+- plugins `.so` dans `./plugins/`,
+- règles `all`, `re`, `clean`, `fclean` accessibles via un simple `make`,
+- flags `-Wall -Wextra -Werror -pedantic` par défaut,
+- séparation Debug (sanitizers) / Release (`-O3`, critique pour un raytracer).
+
+**Détails techniques**
+- **`CMakeLists.txt` racine** : projet `raytracer` en C++20, `CMAKE_POSITION_INDEPENDENT_CODE ON` (requis pour les plugins `.so`), sorties :
+  - `CMAKE_RUNTIME_OUTPUT_DIRECTORY` = racine du repo → produit `./raytracer`.
+  - `CMAKE_LIBRARY_OUTPUT_DIRECTORY` = `./plugins/` → produit `./plugins/raytracer_*.so`.
+  - `CMAKE_ARCHIVE_OUTPUT_DIRECTORY` = `build/archive` pour les `.a` éventuelles (hors du repo tracké).
+- Flags par configuration (générateurs d'expressions `$<CONFIG:...>`) :
+  - **Debug** : `-g -O0 -fsanitize=address,undefined` (compile + link).
+  - **Release** : `-O3 -DNDEBUG` (par défaut si aucun build type spécifié).
+- **`src/CMakeLists.txt`** : cible `raytracer` (executable) avec `main.cpp`. Aucun linkage à des plugins. `libdl` et `libconfig++` seront ajoutés quand les modules concernés arriveront (T0.9, T0.10).
+- **`plugins/CMakeLists.txt`** : vide pour l'instant, documenté. Chaque plugin sera ajouté via `add_subdirectory(<nom>)` au fur et à mesure (T0.15 pour la sphère factice, puis Phase 1).
+- **`src/main.cpp`** : `int main(int, char*[]) { return 0; }`. Le CLI complet (`--help`, exit 84, messages sur `stderr`) est implémenté en T0.3 pour rester fidèle au découpage en tickets atomiques.
+- **`Makefile` wrapper** :
+  - `all` → configure + build (si `CMakeCache.txt` absent, configure d'abord).
+  - `re` → `fclean` + `all`.
+  - `clean` → `cmake --build build --target clean`.
+  - `fclean` → supprime `build/`, `raytracer`, `plugins/*.so|.dylib|.dll`.
+  - Bonus : `debug`, `release`, `help`, variables `BUILD_DIR`, `BUILD_TYPE`, `JOBS` surchargeables.
+
+**Alternatives rejetées**
+- **Makefile pur sans CMake** : écrit et maintenu à la main, lourd dès qu'on aura N plugins `.so`. CMake le fait nativement.
+- **Mettre les plugins dans `build/plugins/`** : non conforme au sujet, qui exige `./plugins/` à la racine.
+- **Linker le binaire à un plugin** : casse le modèle plugin (et la règle `ldd ./raytracer` ne doit lister aucun `raytracer_*.so`).
+
+**Impact**
+- On peut à présent ajouter incrémentalement des modules (core libs, interfaces, plugins) sans retoucher le build system de base.
+- Contrainte de conformité verrouillée : toute régression (binaire hors racine, plugin linké en dur) serait visible immédiatement via `ldd`.
+- `make debug` active ASan/UBSan dès la Phase 0 — tout bug mémoire dans le math ou le loader sera détecté tôt.
+
+**Non couvert volontairement**
+- `--help`, exit 84, erreurs sur `stderr` → T0.3.
+- `libdl`, `libconfig++` → T0.9 / T0.10.
+- Cibles plugin (`raytracer_sphere`, etc.) → T0.15 et Phase 1.
+
+**Validation**
+```bash
+make                       # build OK
+./raytracer; echo $?       # 0
+./raytracer                # aucun output (stdout et stderr vides)
+ldd ./raytracer            # aucun raytracer_*.so linké
+make fclean                # raytracer et build/ supprimés
+make re                    # reconstruit ./raytracer
+make debug                 # build avec sanitizers
+make help                  # affiche les cibles disponibles
+```
+Tous les checks passent.
+
+---
+
 ### v0.0.1 — 2026-04-21 — Initialisation du dépôt (T0.1)
 
 **Type** : infra
