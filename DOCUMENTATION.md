@@ -85,6 +85,62 @@ Exemples :
 
 ## Changelog
 
+### v0.0.3 — 2026-04-21 — CLI conforme Epitech (T0.3)
+
+**Type** : feature
+**Ticket** : T0.3
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Implémentation de l'entrée CLI conforme au sujet : gestion d'`argv`, flag `--help` (alias `-h`), messages d'erreur sur `std::cerr`, codes de sortie `0` / `84`, validation du chemin de scène (existence + fichier régulier).
+
+**Contexte / motivation**
+Le sujet Epitech est strict sur :
+- l'usage exact affiché par `--help`,
+- les erreurs sur `stderr` et **pas** sur `stdout`,
+- le code de retour `84` sur **toute** erreur (argument invalide, fichier introuvable, etc.).
+La moulinette Epitech échoue instantanément si l'un de ces points est faux. On verrouille ça dès la Phase 0 avant tout code de rendu.
+
+**Détails techniques**
+- Fichier modifié : `src/main.cpp` (remplace le placeholder de T0.2).
+- Constantes d'exit codes en `constexpr` (`kExitSuccess = 0`, `kExitFailure = 84`).
+- Usage centralisé dans une `std::string_view` constante (`kUsage`) pour éviter la divergence stdout/stderr.
+- Helper `fail(message)` : écrit sur `std::cerr` avec préfixe `"raytracer: "`, affiche l'usage, retourne `kExitFailure`.
+- Helper `isHelpFlag(arg)` : accepte `--help` et `-h` (alias courant, non exigé mais zéro coût).
+- Validation du fichier de scène :
+  - `std::filesystem::exists` avec `std::error_code` pour éviter les exceptions.
+  - `std::filesystem::is_regular_file` pour rejeter les dossiers et les devices.
+- `runScene()` : stub qui accuse réception du fichier et informe que le pipeline de rendu n'est pas encore câblé (sera remplacé en T0.10+).
+- `#include <string_view>` pour comparer les arguments sans allocation.
+
+**Alternatives rejetées**
+- **Une mini-classe `Cli`** : over-engineering pour 40 lignes. On introduira une classe si le CLI grossit (bonus multi-flags, options de rendu, etc.).
+- **`fprintf(stderr, …)`** : `std::cerr` est plus idiomatique en C++ moderne et cohérent avec le reste du projet.
+- **Ne pas afficher l'usage après l'erreur** : on le fait parce que c'est plus user-friendly et c'est conforme à l'esprit des CLI Epitech.
+- **Bail out sans message propre** : interdit par le sujet (messages d'erreur obligatoires).
+
+**Impact**
+- La conformité Epitech CLI est verrouillée : tout futur changement qui casserait le code 84 ou qui polluerait `stdout` sera détectable immédiatement via les tests manuels documentés ici.
+- `runScene()` est le **point de branchement** pour T0.10 (parser) et T0.14 (renderer) : il sera remplacé par la chaîne complète sans toucher à la gestion d'argv.
+
+**Non couvert volontairement**
+- Parsing du fichier `.cfg` → T0.10.
+- Flags additionnels (`--output`, `--threads`, `--verbose`) → éventuellement en Phase 4 quand les bonus l'exigeront.
+
+**Validation**
+```bash
+./raytracer --help                 # USAGE sur stdout, exit 0
+./raytracer -h                     # idem (alias)
+./raytracer                        # "missing argument" sur stderr, exit 84
+./raytracer nope.cfg               # "scene file not found" sur stderr, exit 84
+./raytracer src                    # "not a regular file" sur stderr, exit 84
+./raytracer a b c                  # "too many arguments" sur stderr, exit 84
+./raytracer /tmp/valid_scene.cfg   # accusé de réception, exit 0
+```
+Tous les checks passent. `stdout` reste strictement vide en cas d'erreur.
+
+---
+
 ### v0.0.2 — 2026-04-21 — Squelette CMake + Makefile wrapper (T0.2)
 
 **Type** : infra
@@ -246,7 +302,20 @@ _Aucun bonus implémenté pour l'instant._
 
 ## Patches / bug fixes
 
-_Aucun patch pour l'instant._
+### 2026-04-21 — Suppression du bruit `gmake[N]: Entering/Leaving directory`
+
+**Fichier** : `Makefile`
+**Type** : chore / DX
+
+**Problème**
+Le wrapper délègue à CMake, qui utilise le générateur "Unix Makefiles" produisant des sous-Makefiles imbriqués (`build/Makefile` → `build/CMakeFiles/Makefile2` → `build/src/CMakeFiles/raytracer.dir/build.make`). À chaque niveau, GNU make loggait `gmake[N]: Entering directory '…'` / `Leaving directory '…'`, ce qui polluait la sortie à chaque `make` / `make re`.
+
+**Fix**
+- Ajout de `MAKEFLAGS += --no-print-directory` dans le Makefile racine — propagé à toutes les invocations récursives.
+- Passage explicite de `-- --no-print-directory` derrière `cmake --build` pour les versions où `MAKEFLAGS` ne passe pas au travers de CMake.
+
+**Résultat**
+Sortie de `make re` réduite aux étapes CMake + compilation ; plus aucun message `gmake[N]:`.
 
 ---
 

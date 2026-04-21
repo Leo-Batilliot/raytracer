@@ -119,7 +119,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `CMakeLists.txt` racine + `src/CMakeLists.txt` + `plugins/CMakeLists.txt` + `Makefile` wrapper.
   - Critère : `make` produit `./raytracer` (main qui retourne 0), `make re` / `make fclean` fonctionnent, `./raytracer` ne produit aucun output et retourne 0.
 
-- [ ] **T0.3 — `main.cpp` minimal conforme Epitech**
+- [x] **T0.3 — `main.cpp` minimal conforme Epitech**
   - Objectif : `--help`, gestion d'argv, erreurs sur `stderr`, exit 84.
   - Livrable : `src/main.cpp`.
   - Critère : `./raytracer --help` affiche l'usage exact du sujet (exit 0) ; `./raytracer` seul → 84 + message stderr ; `./raytracer nope.cfg` → 84 + message stderr.
