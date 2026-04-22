@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.18 — 2026-04-22 — Plugin Plane, parsePrimitives générique (T1.2)](#v0018--2026-04-22--plugin-plane-parseprimitives-générique-t12)
     - [v0.0.17 — 2026-04-22 — Sphere réelle + PrimitiveNode + GroupNode (T1.1)](#v0017--2026-04-22--sphere-réelle--primitivenode--groupnode-t11)
     - [v0.0.16 — 2026-04-22 — Plugin factice sphere, fin Phase 0 (T0.15)](#v0016--2026-04-22--plugin-factice-sphere-fin-phase-0-t015)
     - [v0.0.15 — 2026-04-22 — Renderer tuile-based + Image (T0.14)](#v0015--2026-04-22--renderer-tuile-based--image-t014)
@@ -106,6 +107,24 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.18 — 2026-04-22 — Plugin Plane, parsePrimitives générique (T1.2)
+
+**Type** : feature
+**Ticket** : T1.2
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- `plugins/plane/PlanePlugin.cpp` : `Plane(normal, distance)` — intersection `t=(d−dot(N,O))/dot(N,D)`, deux faces, tangente/bitangente précalculées pour UV, AABB infinie. Config : `normal {x,y,z}`, `distance`.
+- `plugins/plane/CMakeLists.txt` : `raytracer_plane.so`.
+- `plugins/CMakeLists.txt` : `add_subdirectory(plane)`.
+- `src/parser/SceneParser.cpp` : `parsePrimitives` refactorisé avec lambda `loadList(key, kind)` — extensible à tout nouveau type de primitive en une ligne.
+- `scenes/test_plane.cfg` : plan Y=0, caméra à l'horizon (ciel haut, sol bas).
+- `scenes/test_sphere_on_plane.cfg` : sphère T1.1 posée sur plan T1.2.
+
+**Critère validé** : sol (188,255,188) normal (0,1,0), ciel (216,233,255), sphère (188,254,202) distinct des deux. Exit 0, 0 warnings.
+
+---
 
 ### v0.0.17 — 2026-04-22 — Sphere réelle + PrimitiveNode + GroupNode (T1.1)
 

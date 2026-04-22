@@ -100,31 +100,31 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
 
     const libconfig::Setting& prims = config_.lookup("primitives");
 
-    // T1.1: spheres list
-    if (prims.exists("spheres")) {
-        const libconfig::Setting& spheres = prims["spheres"];
-        const int count = spheres.getLength();
-
-        const PluginDescriptor* desc =
-            loader.find(PluginKind::Primitive, "sphere");
+    auto loadList = [&](const char* key, const char* kind) {
+        if (!prims.exists(key)) return;
+        const libconfig::Setting& list = prims[key];
+        const PluginDescriptor*  desc  = loader.find(PluginKind::Primitive, kind);
         if (!desc) {
-            std::cerr << "raytracer: warning: sphere plugin not loaded"
-                         " — skipping spheres section\n";
-        } else {
-            for (int i = 0; i < count; ++i) {
-                void* raw = desc->create(spheres[i]);
-                if (!raw) {
-                    std::cerr << "raytracer: warning: sphere[" << i
-                              << "]: create() failed — skipping\n";
-                    continue;
-                }
-                auto* prim = static_cast<IPrimitive*>(raw);
-                builder.addPrimitive(
-                    std::shared_ptr<IPrimitive>(prim,
-                        [desc](IPrimitive* p) { desc->destroy(p); }));
-            }
+            std::cerr << "raytracer: warning: " << kind
+                      << " plugin not loaded — skipping " << key << " section\n";
+            return;
         }
-    }
+        for (int i = 0, n = list.getLength(); i < n; ++i) {
+            void* raw = desc->create(list[i]);
+            if (!raw) {
+                std::cerr << "raytracer: warning: " << kind << '[' << i
+                          << "]: create() failed — skipping\n";
+                continue;
+            }
+            auto* prim = static_cast<IPrimitive*>(raw);
+            builder.addPrimitive(
+                std::shared_ptr<IPrimitive>(prim,
+                    [desc](IPrimitive* p) { desc->destroy(p); }));
+        }
+    };
+
+    loadList("spheres", "sphere");  // T1.1
+    loadList("planes",  "plane");   // T1.2
 }
 
 }  // namespace rt

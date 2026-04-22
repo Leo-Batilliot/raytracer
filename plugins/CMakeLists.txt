@@ -19,4 +19,5 @@
 #   - T4.x  : phong, reflective, textured, ...
 # =====================================================================
 
-add_subdirectory(sphere)  # T0.15: dummy end-to-end test; real algo in T1.1
+add_subdirectory(sphere)  # T1.1
+add_subdirectory(plane)   # T1.2
