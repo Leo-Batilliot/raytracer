@@ -20,6 +20,8 @@
 
 #include "core/Camera.hpp"
 #include "core/Exceptions.hpp"
+#include "core/Image.hpp"
+#include "core/Renderer.hpp"
 #include "core/SceneBuilder.hpp"
 #include "output/PPMWriter.hpp"
 #include "parser/SceneParser.hpp"
@@ -90,26 +92,14 @@ void runScene(const std::filesystem::path& scenePath)
     rt::SceneParser parser(scenePath);
     rt::SceneBuilder builder;
     builder.setCamera(parser.parseCamera());
-    [[maybe_unused]] rt::Scene scene = builder.build();
+    rt::Scene scene = builder.build();
 
-    // T0.13: render a sky gradient via primary rays to stdout.
-    // Replaced by the full renderer in T0.14.
+    // T0.14: render via the tile-based Renderer.
     rt::Camera camera(scene.camera());
-    const int w = camera.width();
-    const int h = camera.height();
-    std::vector<rt::Color> pixels;
-    pixels.reserve(w * h);
-    for (int y = 0; y < h; ++y) {
-        for (int x = 0; x < w; ++x) {
-            const rt::Ray ray = camera.generateRay(x, y);
-            // Sky gradient: white at horizon (dy≈0), blue at zenith (dy≈1).
-            const auto t = static_cast<float>(0.5 * (ray.direction.y + 1.0));
-            const rt::Color bg = rt::Color{1.0f, 1.0f, 1.0f} * (1.0f - t)
-                               + rt::Color{0.5f, 0.7f, 1.0f} * t;
-            pixels.push_back(bg);
-        }
-    }
-    rt::PPMWriter::write(std::cout, w, h, pixels);
+    rt::Image img(camera.width(), camera.height());
+    rt::Renderer renderer(scene, camera);
+    renderer.renderAll(img);
+    rt::PPMWriter::write(std::cout, img.width(), img.height(), img.pixels());
 }
 
 }  // namespace

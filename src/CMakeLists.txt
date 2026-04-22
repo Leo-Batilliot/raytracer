@@ -17,6 +17,7 @@ add_executable(raytracer
     plugins/PluginLoader.cpp
     parser/SceneParser.cpp
     core/Camera.cpp
+    core/Renderer.cpp
     core/Scene.cpp
     core/SceneBuilder.cpp
 )

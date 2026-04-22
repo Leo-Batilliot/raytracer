@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.15 — 2026-04-22 — Renderer tuile-based + Image (T0.14)](#v0015--2026-04-22--renderer-tuile-based--image-t014)
     - [v0.0.14 — 2026-04-22 — Camera pinhole + rayons primaires (T0.13)](#v0014--2026-04-22--camera-pinhole--rayons-primaires-t013)
     - [v0.0.13 — 2026-04-22 — PPMWriter : sortie P6 binaire, sRGB (T0.12)](#v0013--2026-04-22--ppmwriter--sortie-p6-binaire-srgb-t012)
     - [v0.0.12 — 2026-04-22 — SceneBuilder + Scene immuable (T0.11)](#v0012--2026-04-22--scenebuilder--scene-immuable-t011)
@@ -103,6 +104,24 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.15 — 2026-04-22 — Renderer tuile-based + Image (T0.14)
+
+**Type** : feature
+**Ticket** : T0.14
+**Phase** : 0 (Fondations)
+
+**Contexte** : Le code ad-hoc T0.13 calculait les pixels dans `runScene()`. Il faut l'encapsuler dans un `Renderer` réutilisable, partitionné en tuiles pour préparer la parallélisation (T3.2).
+
+**Ce qui a changé** :
+- `src/core/Image.hpp` : buffer pixel row-major `vector<Color>`, accesseurs `at(x,y)`, `pixels()`, `width()`, `height()` (header-only).
+- `src/core/Renderer.hpp/.cpp` : `Renderer(Scene&, Camera&)`, `renderTile(x0,y0,x1,y1, Image&)`, `renderAll(Image&)` (tuiles 64×64). `shade(ray)` : appel `scene_.intersect()` → gris #808080 si hit (placeholder T0.15), sinon dégradé ciel.
+- `main.cpp` : `runScene()` simplifié à 4 lignes : `Camera` → `Image` → `Renderer::renderAll` → `PPMWriter::write`. Suppression du `[[maybe_unused]]`.
+- `src/CMakeLists.txt` : `core/Renderer.cpp` ajouté.
+
+**Critère validé** : image 800×600 identique au dégradé T0.13, aucune couture aux frontières de tuile (pixels (63,0) et (64,0) identiques).
+
+---
 
 ### v0.0.14 — 2026-04-22 — Camera pinhole + rayons primaires (T0.13)
 

@@ -180,10 +180,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/core/Camera.hpp/.cpp`.
   - Critère : rendu d'un fond dégradé dépendant de la direction du rayon = dégradé correct sur l'image (✓) ; 800×600 pixels, R monotone top→bot (207→225→240), zenith bleu-azur, horizon blanc.
 
-- [ ] **T0.14 — `Renderer` (tuile-based dès le départ)**
+- [x] **T0.14 — `Renderer` (tuile-based dès le départ)**
   - Objectif : `renderTile(x0,y0,x1,y1, Image&)` + `renderAll()` qui itère.
   - Livrable : `src/core/Renderer.hpp/.cpp`.
-  - Critère : image de fond dégradé rendue via le renderer, pas via code ad-hoc.
+  - Critère : image de fond dégradé rendue via le renderer, pas via code ad-hoc (✓) ; 1 440 000 octets pixels, gradient identique à T0.13, pas de couture aux frontières de tuiles (pixel (63,0) == (64,0)).
 
 - [ ] **T0.15 — Plugin factice "sphere" (end-to-end)**
   - Objectif : prouver que la chaîne plugin fonctionne bout en bout.
