@@ -18,6 +18,7 @@
 #include <string>
 #include <string_view>
 
+#include "core/Camera.hpp"
 #include "core/Exceptions.hpp"
 #include "core/SceneBuilder.hpp"
 #include "output/PPMWriter.hpp"
@@ -91,20 +92,24 @@ void runScene(const std::filesystem::path& scenePath)
     builder.setCamera(parser.parseCamera());
     [[maybe_unused]] rt::Scene scene = builder.build();
 
-    // T0.12: write a 256×256 checkerboard to stdout as PPM P6.
-    // Replaced by the real renderer in T0.14.
-    constexpr int kW = 256;
-    constexpr int kH = 256;
-    constexpr int kTile = 32;
+    // T0.13: render a sky gradient via primary rays to stdout.
+    // Replaced by the full renderer in T0.14.
+    rt::Camera camera(scene.camera());
+    const int w = camera.width();
+    const int h = camera.height();
     std::vector<rt::Color> pixels;
-    pixels.reserve(kW * kH);
-    for (int y = 0; y < kH; ++y) {
-        for (int x = 0; x < kW; ++x) {
-            const bool white = ((x / kTile) + (y / kTile)) % 2 == 0;
-            pixels.push_back(white ? rt::Color::white() : rt::Color::black());
+    pixels.reserve(w * h);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const rt::Ray ray = camera.generateRay(x, y);
+            // Sky gradient: white at horizon (dy≈0), blue at zenith (dy≈1).
+            const auto t = static_cast<float>(0.5 * (ray.direction.y + 1.0));
+            const rt::Color bg = rt::Color{1.0f, 1.0f, 1.0f} * (1.0f - t)
+                               + rt::Color{0.5f, 0.7f, 1.0f} * t;
+            pixels.push_back(bg);
         }
     }
-    rt::PPMWriter::write(std::cout, kW, kH, pixels);
+    rt::PPMWriter::write(std::cout, w, h, pixels);
 }
 
 }  // namespace

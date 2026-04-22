@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.14 — 2026-04-22 — Camera pinhole + rayons primaires (T0.13)](#v0014--2026-04-22--camera-pinhole--rayons-primaires-t013)
     - [v0.0.13 — 2026-04-22 — PPMWriter : sortie P6 binaire, sRGB (T0.12)](#v0013--2026-04-22--ppmwriter--sortie-p6-binaire-srgb-t012)
     - [v0.0.12 — 2026-04-22 — SceneBuilder + Scene immuable (T0.11)](#v0012--2026-04-22--scenebuilder--scene-immuable-t011)
     - [v0.0.11 — 2026-04-22 — SceneParser minimal : libconfig++, section camera (T0.10)](#v0011--2026-04-22--sceneparser-minimal--libconfig-section-camera-t010)
@@ -102,6 +103,27 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.14 — 2026-04-22 — Camera pinhole + rayons primaires (T0.13)
+
+**Type** : feature
+**Ticket** : T0.13
+**Phase** : 0 (Fondations)
+
+**Contexte** : La scène parsée fournit un `CameraConfig` (position, lookAt, up, FoV, résolution). Il faut en dériver des rayons monde pour chaque pixel de l'image.
+
+**Ce qui a changé** :
+- `src/core/Camera.hpp/.cpp` : modèle sténopé. Le constructeur précalcule la base orthonormée `(u, v, w)` et les vecteurs d'écran `lowerLeft_`, `horizontal_`, `vertical_`; `generateRay(px, py)` est un hot path arithmétique pur (sans throw).
+  - Base : `w = normalize(position − lookAt)`, `u = normalize(up × w)`, `v = w × u`.
+  - Demi-extents : `halfH = tan(fov * π / 360)`, `halfW = halfH × (width / height)`.
+  - Convention pixels : `(0,0)` = coin haut-gauche, `y` croît vers le bas.
+  - Normalisation safe dans `generateRay` : fallback `-z` si direction nulle (ne se produit pas avec une config valide).
+- `main.cpp` : `runScene()` remplace le damier T0.12 par un rendu dégradé ciel (bleu-azur au zénith, blanc à l'horizon) via les rayons primaires.
+- `src/CMakeLists.txt` : `core/Camera.cpp` ajouté.
+
+**Critère validé** : image 800×600, canal R monotone croissant top→bot (207→225→240), zénith (207, 228, 255), horizon (240, 246, 255).
+
+---
 
 ### v0.0.13 — 2026-04-22 — PPMWriter : sortie P6 binaire, sRGB (T0.12)
 

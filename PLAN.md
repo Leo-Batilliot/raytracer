@@ -175,10 +175,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/output/PPMWriter.hpp/.cpp`.
   - Critère : damier 256×256 écrit, visualisable (✓) ; header P6 valide, 196 608 octets pixels, cases blanc/noir alternées sur 32 px.
 
-- [ ] **T0.13 — `Camera` pinhole + rayons primaires**
+- [x] **T0.13 — `Camera` pinhole + rayons primaires**
   - Objectif : `generateRay(x, y)` renvoie un rayon en espace monde selon FoV, position, rotation.
   - Livrable : `src/core/Camera.hpp/.cpp`.
-  - Critère : rendu d'un fond dégradé dépendant de la direction du rayon = dégradé correct sur l'image.
+  - Critère : rendu d'un fond dégradé dépendant de la direction du rayon = dégradé correct sur l'image (✓) ; 800×600 pixels, R monotone top→bot (207→225→240), zenith bleu-azur, horizon blanc.
 
 - [ ] **T0.14 — `Renderer` (tuile-based dès le départ)**
   - Objectif : `renderTile(x0,y0,x1,y1, Image&)` + `renderAll()` qui itère.

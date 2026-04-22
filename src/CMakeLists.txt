@@ -16,6 +16,7 @@ add_executable(raytracer
     output/PPMWriter.cpp
     plugins/PluginLoader.cpp
     parser/SceneParser.cpp
+    core/Camera.cpp
     core/Scene.cpp
     core/SceneBuilder.cpp
 )
