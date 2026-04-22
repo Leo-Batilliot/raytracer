@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.26 — 2026-04-23 — Plugin Cone (T2.2)](#v0026--2026-04-23--plugin-cone-t22)
     - [v0.0.25 — 2026-04-23 — Plugin Cylinder (T2.1)](#v0025--2026-04-23--plugin-cylinder-t21)
     - [v0.0.24 — 2026-04-22 — Scènes de démo Phase 1 (T1.8)](#v0024--2026-04-22--scènes-de-démo-phase-1-t18)
     - [v0.0.23 — 2026-04-22 — Parser complet : matériaux + translation (T1.7)](#v0023--2026-04-22--parser-complet--matériaux--translation-t17)
@@ -114,6 +115,28 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.26 — 2026-04-23 — Plugin Cone (T2.2)
+
+**Type** : feature
+**Ticket** : T2.2
+**Phase** : 2 (SHOULD)
+
+**Ce qui a changé** :
+- `plugins/cone/ConePlugin.cpp` : `Cone(center, radius, height)` — cône fini, apex en haut (y=+halfH), base en bas (y=-halfH).
+  - Surface implicite : `f = x²+z² − k²·(halfH−y)²` où `k = radius/height`.
+  - Quadratique : `a = Dx²+Dz²−k²Dy²`, `half_b = Ox·Dx+Oz·Dz+k²·α·Dy`, `c = Ox²+Oz²−k²·α²` (α = halfH−Oy).
+  - Deux racines triées (min,max) — première valide dans `[-halfH, halfH]` retenue (gère `a<0` correctement).
+  - Normale corps : `normalize(hx, k²·(halfH−hy), hz)` (gradient de f).
+  - Cap base unique en y=−halfH : disque radius, normale (0,−1,0).
+  - UV body : azimuth + hauteur normalisée. UV cap : projection XZ.
+- `plugins/cone/CMakeLists.txt` + `plugins/CMakeLists.txt`.
+- `src/parser/SceneParser.cpp` : `loadList("cones", "cone")`.
+- `scenes/test_cone.cfg` (320×240) + `scenes/demo_cone.cfg` (800×600, cônes + cylindres + sphères).
+
+**Critère validé** : corps orange Lambert (G réduit flanc vs cap), base disk visible, exit 0, 0 warnings.
+
+---
 
 ### v0.0.25 — 2026-04-23 — Plugin Cylinder (T2.1)
 

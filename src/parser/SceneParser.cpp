@@ -149,6 +149,7 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
     loadList("spheres",    "sphere");    // T1.1
     loadList("planes",     "plane");     // T1.2
     loadList("cylinders",  "cylinder");  // T2.1
+    loadList("cones",      "cone");      // T2.2
 }
 
 // ----------------------------------------------------------------

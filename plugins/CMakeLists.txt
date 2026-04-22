@@ -25,3 +25,4 @@ add_subdirectory(ambient)     # T1.3
 add_subdirectory(directional) # T1.4
 add_subdirectory(flat_color)  # T1.5
 add_subdirectory(cylinder)    # T2.1
+add_subdirectory(cone)        # T2.2
