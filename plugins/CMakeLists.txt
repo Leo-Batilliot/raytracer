@@ -19,6 +19,4 @@
 #   - T4.x  : phong, reflective, textured, ...
 # =====================================================================
 
-# Intentionally empty for now. Subdirectories will be added as each
-# plugin ticket is completed, e.g.:
-#   add_subdirectory(sphere)
+add_subdirectory(sphere)  # T0.15: dummy end-to-end test; real algo in T1.1

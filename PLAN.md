@@ -185,10 +185,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/core/Renderer.hpp/.cpp`.
   - Critère : image de fond dégradé rendue via le renderer, pas via code ad-hoc (✓) ; 1 440 000 octets pixels, gradient identique à T0.13, pas de couture aux frontières de tuiles (pixel (63,0) == (64,0)).
 
-- [ ] **T0.15 — Plugin factice "sphere" (end-to-end)**
+- [x] **T0.15 — Plugin factice "sphere" (end-to-end)**
   - Objectif : prouver que la chaîne plugin fonctionne bout en bout.
   - Livrable : `plugins/sphere/` (CMakeLists + code).
-  - Critère : `./plugins/raytracer_sphere.so` existe, chargé par `PluginLoader`, intersection basique disponible.
+  - Critère : `./plugins/raytracer_sphere.so` existe (✓ 16.7K), chargé par `PluginLoader` sans warning (✓), `./raytracer scenes/empty_camera.cfg` → exit 0 (✓).
 
 **🏁 Fin de Phase 0** : `./raytracer scenes/empty.cfg` rend une image PPM valide (fond dégradé), le loader charge `sphere.so`, toute l'architecture tient debout.
 

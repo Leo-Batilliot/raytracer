@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.16 — 2026-04-22 — Plugin factice sphere, fin Phase 0 (T0.15)](#v0016--2026-04-22--plugin-factice-sphere-fin-phase-0-t015)
     - [v0.0.15 — 2026-04-22 — Renderer tuile-based + Image (T0.14)](#v0015--2026-04-22--renderer-tuile-based--image-t014)
     - [v0.0.14 — 2026-04-22 — Camera pinhole + rayons primaires (T0.13)](#v0014--2026-04-22--camera-pinhole--rayons-primaires-t013)
     - [v0.0.13 — 2026-04-22 — PPMWriter : sortie P6 binaire, sRGB (T0.12)](#v0013--2026-04-22--ppmwriter--sortie-p6-binaire-srgb-t012)
@@ -104,6 +105,25 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.16 — 2026-04-22 — Plugin factice sphere, fin Phase 0 (T0.15)
+
+**Type** : feature
+**Ticket** : T0.15
+**Phase** : 0 (Fondations) — dernier ticket
+
+**Contexte** : Valider la chaîne dlopen → ABI → registre bout en bout avant d'implémenter la vraie géométrie en Phase 1.
+
+**Ce qui a changé** :
+- `plugins/sphere/SpherePlugin.cpp` : `DummySphere` (IPrimitive, `intersect` retourne toujours false, `bounds` = AABB [-1,1]³). Fonctions `create`/`destroy` sans throw, macro `RAYTRACER_PLUGIN_ENTRY`. Pas de dépendance à libconfig++ (paramètre ignoré avec forward-decl).
+- `plugins/sphere/CMakeLists.txt` : `add_library(raytracer_sphere SHARED ...)`, `PREFIX ""` → `raytracer_sphere.so`.
+- `plugins/CMakeLists.txt` : `add_subdirectory(sphere)` ajouté.
+
+**Critère validé** : `./plugins/raytracer_sphere.so` (16.7K), chargé par `PluginLoader` sans warning stderr, `./raytracer scenes/empty_camera.cfg` → exit 0.
+
+**🏁 Phase 0 complète** : toute l'architecture (math, interfaces, ABI, PluginLoader, SceneParser, SceneBuilder, Camera, Renderer, PPMWriter) tient debout. Le binaire rend un dégradé ciel 800×600 et charge le plugin sphere.
+
+---
 
 ### v0.0.15 — 2026-04-22 — Renderer tuile-based + Image (T0.14)
 
