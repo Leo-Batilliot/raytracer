@@ -15,6 +15,8 @@ add_executable(raytracer
     math/Transform.cpp
     plugins/PluginLoader.cpp
     parser/SceneParser.cpp
+    core/Scene.cpp
+    core/SceneBuilder.cpp
 )
 
 target_link_libraries(raytracer

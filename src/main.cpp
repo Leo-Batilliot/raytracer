@@ -19,6 +19,7 @@
 #include <string_view>
 
 #include "core/Exceptions.hpp"
+#include "core/SceneBuilder.hpp"
 #include "parser/SceneParser.hpp"
 #include "plugins/PluginLoader.hpp"
 
@@ -83,11 +84,13 @@ void runScene(const std::filesystem::path& scenePath)
     // T0.9: load plugins from ./plugins/ (none yet in Phase 0).
     rt::PluginLoader loader("./plugins");
 
-    // T0.10: parse the scene file (camera section validated here).
+    // T0.10 + T0.11: parse → build immutable Scene.
     rt::SceneParser parser(scenePath);
-    [[maybe_unused]] rt::CameraConfig cam = parser.parseCamera();
+    rt::SceneBuilder builder;
+    builder.setCamera(parser.parseCamera());
+    [[maybe_unused]] rt::Scene scene = builder.build();
 
-    // T0.11+: SceneBuilder → Scene → Renderer.
+    // T0.12+: PPMWriter, Camera, Renderer.
     // (rendering pipeline not yet implemented)
 }
 

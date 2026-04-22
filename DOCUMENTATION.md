@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.12 — 2026-04-22 — SceneBuilder + Scene immuable (T0.11)](#v0012--2026-04-22--scenebuilder--scene-immuable-t011)
     - [v0.0.11 — 2026-04-22 — SceneParser minimal : libconfig++, section camera (T0.10)](#v0011--2026-04-22--sceneparser-minimal--libconfig-section-camera-t010)
     - [v0.0.10 — 2026-04-22 — PluginLoader : encapsulation dlopen/dlsym/dlclose (T0.9)](#v0010--2026-04-22--pluginloader--encapsulation-dlopendlsymdlclose-t09)
     - [v0.0.9 — 2026-04-22 — ABI plugins : PluginDescriptor, RAYTRACER_ABI_VERSION (T0.8)](#v009--2026-04-22--abi-plugins--plugindescriptor-raytracer_abi_version-t08)
@@ -100,6 +101,84 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.12 — 2026-04-22 — SceneBuilder + Scene immuable (T0.11)
+
+**Type** : feature
+**Ticket** : T0.11
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Introduction du Builder pattern pour la construction de scène : `rt::SceneBuilder` accumule caméra, nœuds, lumières et matériaux nommés, puis construit une `rt::Scene` **immuable** via `build()`. `CameraConfig` est extrait de `SceneParser.hpp` dans `core/CameraConfig.hpp` pour éviter une dépendance core → parser. `runScene()` est désormais complet : `PluginLoader → SceneParser → SceneBuilder → Scene`.
+
+**Contexte / motivation**
+La `Scene` est l'état global du rendu : chaque thread de rendu (T3.2) la lit en lecture seule. L'immuabilité post-construction est la propriété qui permet un multithreading sans verrous. Le Builder sépare la phase d'accumulation (mutable, séquentielle) de la phase de lecture (immuable, parallèle).
+
+La résolution des matériaux par nom est aussi centralisée ici : le `SceneParser` (T1.7) lit `material = "red"` dans le `.cfg`, le `SceneBuilder` a enregistré `"red"` → un `shared_ptr<IMaterial>`, et la `Scene` expose `findMaterial(name) → const IMaterial*` utilisée par les plugins lors du shade.
+
+**Détails techniques**
+
+- **`src/core/CameraConfig.hpp`** — POD extrait de `SceneParser.hpp`.
+  - Raison : `Scene.hpp` a besoin de `CameraConfig` ; si ce type vivait dans `SceneParser.hpp`, `Scene.hpp → SceneParser.hpp → libconfig.h++` créerait une dépendance core → parser → lib tierce. Extraire `CameraConfig` dans core coupe cette chaîne.
+  - `SceneParser.hpp` inclut désormais `core/CameraConfig.hpp` (parser → core, sens correct).
+- **`src/core/Scene.hpp`** — snapshot immuable.
+  - Non-copiable (`= delete`), movable (`= default`) pour le retour par valeur depuis `build()` (NRVO).
+  - Destructeur déclaré dans `.hpp`, défini dans `.cpp` (où `IMaterial.hpp` est inclus) pour éviter la dépendance circulaire `Scene.hpp → IMaterial.hpp → ShadingContext.hpp → Scene.hpp`.
+  - `class IMaterial;` forward-declared dans `Scene.hpp` ; `shared_ptr<IMaterial>` est valide avec un type incomplet pour le stockage (le destructeur nécessite le type complet → dans `.cpp`).
+  - Accesseurs : `camera()`, `lights()`, `findMaterial(string_view)`, `intersect(Ray, HitRecord&)`.
+  - `intersect()` : délègue à `root_->intersect()` si root non nul, sinon false (scène vide → tous les rayons manquent → couleur de fond).
+  - Constructeur privé + `friend class SceneBuilder` : seul le builder peut construire une Scene.
+- **`src/core/Scene.cpp`** — implémentations.
+  - `~Scene() = default` défini ici (type `IMaterial` complet requis pour `~shared_ptr<IMaterial>`).
+  - `findMaterial` : `O(log n)` via `std::map::find`.
+- **`src/core/SceneBuilder.hpp/.cpp`** — Builder pattern.
+  - API fluente : chaque setter retourne `*this`.
+  - `std::optional<CameraConfig> camera_` : absent → `build()` throw `rt::InvalidConfigError`.
+  - `setRoot(shared_ptr<INode>)`, `addLight(shared_ptr<ILight>)`, `registerMaterial(name, shared_ptr<IMaterial>)` — toutes les données sont moved dans la Scene lors de `build()`.
+  - Registre matériaux : `map<string, shared_ptr<IMaterial>>` — "last registration wins" (cohérent avec libconfig++ où la dernière définition écrase la précédente).
+- **`src/main.cpp` — `runScene()` finalisé pour Phase 0** :
+  ```cpp
+  rt::PluginLoader  loader("./plugins");
+  rt::SceneParser   parser(scenePath);
+  rt::SceneBuilder  builder;
+  builder.setCamera(parser.parseCamera());
+  rt::Scene scene = builder.build();
+  // T0.12+: renderer
+  ```
+- **`src/CMakeLists.txt`** : ajout de `core/Scene.cpp` et `core/SceneBuilder.cpp`.
+
+**Alternatives rejetées**
+- **`Scene` copiable** : la scène peut contenir des centaines de milliers de nœuds. Une copie serait onéreuse et sémantiquement erronée (deux threads ne devraient pas chacun avoir leur propre copie — ils lisent la même). Move-only + référence partagée via `const Scene&` dans les `ShadingContext` est la politique correcte.
+- **Constructeur public de Scene** : permettrait de bypasser le builder et de construire une scène sans caméra → undefined behaviour dans le renderer. Le constructeur privé + `friend SceneBuilder` verrouille le point d'entrée.
+- **`Scene` avec méthodes mutables (`addNode`, etc.)** : briserait l'immuabilité, empêcherait le multithreading lock-free.
+- **`map<string, IMaterial*>` au lieu de `shared_ptr`** : gestion manuelle de la durée de vie → impossible à sécuriser correctement. `shared_ptr` garantit que le matériau survit aussi longtemps que la scène.
+- **`unordered_map` pour les matériaux** : O(1) vs O(log n) sur quelques dizaines de matériaux → différence négligeable, `std::map` évite de définir un hash.
+- **Inclure `IMaterial.hpp` dans `Scene.hpp`** : créerait la dépendance circulaire `Scene → IMaterial → ShadingContext → Scene`. La forward-declaration + destructor-in-cpp est le pattern standard C++ pour ce cas.
+- **`GroupNode` intégré dans T0.11** : ajouterait une implémentation concrète de `INode` à ce ticket. T0.11 reste délibérément abstrait — les implémentations concrètes arrivent en T0.15 et Phase 1. La `Scene` accepte un root nul ("scène vide").
+
+**Impact**
+- **`ShadingContext::scene`** est désormais utilisable en entier : `ctx.scene.findMaterial(...)`, `ctx.scene.intersect(...)`, `ctx.scene.lights()` sont accessibles depuis `IMaterial::shade()`.
+- **T0.12** (PPMWriter) : la scène est construite, la résolution image est connue (`scene.camera().width`, `.height`).
+- **T0.13** (Camera) : `Camera(scene.camera())` construit la caméra depuis le config.
+- **T1.1+** (primitives) : `SceneBuilder::setRoot(node)` est prêt ; `SceneBuilder::registerMaterial(name, mat)` est prêt.
+- **T3.2** (multithreading) : la scène étant immuable, les threads peuvent lire `scene.intersect()` en parallèle sans synchronisation.
+- **Régression** : `SceneParser.hpp` a perdu la définition locale de `CameraConfig` au profit d'un `#include "core/CameraConfig.hpp"`. Vérifier que les fichiers qui incluaient `SceneParser.hpp` et utilisaient `rt::CameraConfig` compilent toujours — oui (`SceneBuilder.cpp`, `main.cpp`).
+
+**Non couvert volontairement**
+- `Scene::root()` comme accesseur public — le renderer accède à la scène via `intersect()` ; exposer le root permettrait des downcasts dangereux.
+- Validation de `CameraConfig` (fov > 0, width > 0…) → T0.13 (Camera vérifiera lors de sa construction).
+- `GroupNode` (nœud Composite concret) → T0.15 ou T1.1 quand les premières primitives arriveront.
+
+**Validation**
+```bash
+make re
+./raytracer scenes/empty_camera.cfg; echo $?     # 0 ✓
+./raytracer; echo $?                              # 84 (CliError)
+./raytracer nope.cfg; echo $?                     # 84 (IOError)
+ldd ./raytracer | grep raytracer_                 # vide
+```
+
+---
 
 ### v0.0.11 — 2026-04-22 — SceneParser minimal : libconfig++, section camera (T0.10)
 

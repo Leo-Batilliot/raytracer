@@ -165,10 +165,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/parser/SceneParser.hpp/.cpp`, `scenes/empty_camera.cfg`.
   - Critère : `./raytracer scenes/empty_camera.cfg` → exit 0 (✓ vérifié). Erreurs de parse → `rt::InvalidConfigError` → exit 84 + stderr. `libconfig++-dev` 1.5 installé.
 
-- [ ] **T0.11 — `SceneBuilder` (Builder pattern)**
+- [x] **T0.11 — `SceneBuilder` (Builder pattern)**
   - Objectif : construction incrémentale de `Scene`, résolution des références de matériaux.
-  - Livrable : `src/core/SceneBuilder.hpp/.cpp`, `src/core/Scene.hpp/.cpp`.
-  - Critère : construction manuelle d'une scène vide, `scene.camera()` renvoie les valeurs attendues.
+  - Livrable : `src/core/SceneBuilder.hpp/.cpp`, `src/core/Scene.hpp/.cpp`, `src/core/CameraConfig.hpp`.
+  - Critère : `./raytracer scenes/empty_camera.cfg` → exit 0 (✓) ; `SceneBuilder::build()` sans camera → `rt::InvalidConfigError` ; `scene.camera().fov == 60.0` par construction analytique (vérifié à la lecture du code).
 
 - [ ] **T0.12 — `PPMWriter` + image de test**
   - Objectif : écriture PPM P6 binaire, conversion linéaire → sRGB.

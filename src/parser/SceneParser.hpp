@@ -26,23 +26,10 @@
 
 #include <libconfig.h++>
 
+#include "core/CameraConfig.hpp"  // CameraConfig moved here in T0.11
 #include "math/Vector3.hpp"
 
 namespace rt {
-
-// ----------------------------------------------------------------
-// Plain data structs — one per config section.
-// SceneParser → SceneBuilder → Scene (T0.11).
-// ----------------------------------------------------------------
-
-struct CameraConfig {
-    Vector3 position{0.0, 0.0, 5.0};
-    Vector3 lookAt  {0.0, 0.0, 0.0};
-    Vector3 up      {0.0, 1.0, 0.0};
-    double  fov    = 60.0;   // vertical field-of-view, degrees
-    int     width  = 800;
-    int     height = 600;
-};
 
 // ----------------------------------------------------------------
 // SceneParser
