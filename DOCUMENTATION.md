@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.24 — 2026-04-22 — Scènes de démo Phase 1 (T1.8)](#v0024--2026-04-22--scènes-de-démo-phase-1-t18)
     - [v0.0.23 — 2026-04-22 — Parser complet : matériaux + translation (T1.7)](#v0023--2026-04-22--parser-complet--matériaux--translation-t17)
     - [v0.0.22 — 2026-04-22 — Pipeline d'éclairage minimal (T1.6)](#v0022--2026-04-22--pipeline-déclairage-minimal-t16)
     - [v0.0.21 — 2026-04-22 — Plugin FlatColor + parseMaterials (T1.5)](#v0021--2026-04-22--plugin-flatcolor--parsematerials-t15)
@@ -112,6 +113,27 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.24 — 2026-04-22 — Scènes de démo Phase 1 (T1.8)
+
+**Type** : docs / chore
+**Ticket** : T1.8
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- Résolution augmentée : toutes les démo passent à 800×600 minimum (les test_* restent en 320×240).
+- `scenes/demo_sphere.cfg` (800×600) : sphère rouge dramatique sur sol nacré, lumière chaude en haut-gauche.
+- `scenes/demo_plane.cfg` (800×600) : plan gris à faible angle de caméra, sphère cobalt en ancrage.
+- `scenes/demo_flat_color.cfg` (800×600) : 6 sphères en arc — rouge, orange, jaune, vert, bleu, violet.
+- `scenes/light_ambient.cfg` (800×600) : ambient seul (intensity=0.85), surfaces plates sans gradient.
+- `scenes/light_directional.cfg` (800×600) : ambient minimal (0.04) + directional fort, gradient Lambert maximal.
+- `scenes/demo_translation.cfg` (800×600) : 6 sphères via `translate` uniquement, grille 3×2.
+- `scenes/demo_showcase.cfg` (1280×720) : 12 sphères + 2 plans, 10 matériaux, 2 lumières directionnelles (key + fill), mix direct/translate.
+- `screenshots/` : tous les rendus sauvegardés.
+
+**Critère validé** : 7 scènes → exit 0, rendus sauvegardés dans `screenshots/`. Showcase 2.6 MB = 1280×720×3 octets (✓).
+
+---
 
 ### v0.0.23 — 2026-04-22 — Parser complet : matériaux + translation (T1.7)
 
