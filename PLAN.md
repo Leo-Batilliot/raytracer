@@ -155,10 +155,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/interfaces/plugin_abi.hpp`.
   - Critère : `RAYTRACER_ABI_VERSION = 1` défini ; `PluginDescriptor` + macro `RAYTRACER_PLUGIN_ENTRY` compilent des deux côtés (core et plugin simulé) sous `-Wall -Wextra -Werror -pedantic` (vérifié).
 
-- [ ] **T0.9 — `PluginLoader` (encapsulation `libdl`)**
+- [x] **T0.9 — `PluginLoader` (encapsulation `libdl`)**
   - Objectif : seul endroit avec `dlopen`/`dlsym`/`dlclose`, RAII strict.
   - Livrable : `src/plugins/PluginLoader.hpp/.cpp`.
-  - Critère : charge tous les `./plugins/*.so` au démarrage, indexe par (kind, name) ; ABI mismatch → warning stderr + rejet propre ; pas de fuite handle.
+  - Critère : build propre 0 warning ; RAII (destructor dlclose inverse-order) ; 7 guards dans loadOne (dlopen, dlsym, entry non-null, name non-vide, create/destroy non-null, ABI mismatch, duplicate) → warning stderr + rejet propre ; `ldd ./raytracer` ne liste aucun plugin ; `libdl` lié.
 
 - [ ] **T0.10 — `SceneParser` minimal (libconfig++)**
   - Objectif : ouverture fichier, lecture de la section `camera`.

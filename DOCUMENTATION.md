@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.10 — 2026-04-22 — PluginLoader : encapsulation dlopen/dlsym/dlclose (T0.9)](#v0010--2026-04-22--pluginloader--encapsulation-dlopendlsymdlclose-t09)
     - [v0.0.9 — 2026-04-22 — ABI plugins : PluginDescriptor, RAYTRACER_ABI_VERSION (T0.8)](#v009--2026-04-22--abi-plugins--plugindescriptor-raytracer_abi_version-t08)
     - [v0.0.8 — 2026-04-22 — Interfaces publiques : IPrimitive, INode, ILight, IMaterial (T0.7)](#v008--2026-04-22--interfaces-publiques--iprimitive-inode-ilight-imaterial-t07)
     - [v0.0.7 — 2026-04-22 — Types POD partagés : Ray, HitRecord, ShadingContext, AABB (T0.6)](#v007--2026-04-22--types-pod-partagés--ray-hitrecord-shadingcontext-aabb-t06)
@@ -98,6 +99,78 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.10 — 2026-04-22 — PluginLoader : encapsulation dlopen/dlsym/dlclose (T0.9)
+
+**Type** : feature
+**Ticket** : T0.9
+**Phase** : 0 (Fondations)
+
+**Résumé**
+`rt::PluginLoader` — classe RAII qui scanne `./plugins/*.so`, résout `raytracer_plugin_entry` via `dlsym`, valide le `PluginDescriptor` (7 guards séquentiels), et indexe les plugins valides par `(PluginKind, name)`. Seul fichier du projet autorisé à appeler `dlopen`/`dlsym`/`dlclose`. `libdl` ajouté au linkage.
+
+**Contexte / motivation**
+Le critère T0.9 impose : "seul endroit avec `dlopen`/`dlsym`/`dlclose`". Concentrer ces appels ici garantit qu'aucun autre module ne peut fuir un handle ou oublier un `dlclose`. La logique de validation est également centralisée : un plugin mal formé (ABI mismatch, descripteur nul, entrée manquante) est rejeté proprement avec un warning lisible sur `stderr`, sans jamais crasher le processus.
+
+**Détails techniques**
+
+- **`src/plugins/PluginLoader.hpp`** — interface publique, sans `<dlfcn.h>`.
+  - Constructeur `explicit PluginLoader(fs::path pluginDir = "./plugins")` : scanne et charge.
+  - Destructeur déclaré (défini dans `.cpp` pour garder `<dlfcn.h>` hors du header).
+  - Non-copiable (handles uniques), movable (ownership transféré, ancien cleared).
+  - `find(kind, name_view) → const PluginDescriptor*` : O(log n) via `std::map`.
+  - `count() → size_t` : nombre de plugins valides chargés.
+  - Membres privés : `std::vector<void*> handles_` + `std::map<pair<PluginKind, string>, const PluginDescriptor*> registry_`.
+- **`src/plugins/PluginLoader.cpp`** — seul fichier qui `#include <dlfcn.h>`.
+  - **`sym_to_fn<FnPtr>(void*)`** (template local anonyme) : workaround POSIX pour caster `void*` → pointeur de fonction sans violer `-Wpedantic`. Utilise `std::memcpy` + `static_assert(sizeof(FnPtr) == sizeof(void*))`. La norme ISO C++ interdit le `reinterpret_cast` entre data et function pointer ; `memcpy` contourne l'UB formellement.
+  - **`loadOne(path)` — 7 guards séquentiels** :
+    1. `dlopen(RTLD_NOW | RTLD_LOCAL)` → warning + return sur échec. `RTLD_NOW` : résolution immédiate (erreur détectée au load, pas au premier appel). `RTLD_LOCAL` : symboles du plugin isolés (pas de pollution globale).
+    2. `dlsym("raytracer_plugin_entry")` → warning + `dlclose` + return si absent.
+    3. Appel de `entry()` → warning + `dlclose` si retourne nullptr.
+    4. `desc->name` non vide → warning + `dlclose` si vide.
+    5. `desc->create` et `desc->destroy` non nuls → warning + `dlclose`.
+    6. `desc->abi_version == RAYTRACER_ABI_VERSION` → warning avec versions attendues/reçues + `dlclose`.
+    7. Pas de doublon `(kind, name)` dans le registry → warning "first wins" + `dlclose`.
+    - **Handle enregistré uniquement si tous les guards passent** → pas de fuite si un guard échoue en milieu de chaîne.
+  - **Destructeur** : parcourt `handles_` en ordre **inverse** (LIFO — miroir de l'ordre de load, respecte les dépendances éventuelles entre plugins).
+  - **Move** : `operator=` ferme les handles courants avant le move ; source est cleared (handles nullifiés pour que son destructeur ne double-close pas).
+- **`src/CMakeLists.txt`** : ajout de `plugins/PluginLoader.cpp` à l'exécutable + `target_link_libraries(... dl)`.
+- **Chargement du répertoire** : utilise `std::filesystem::is_directory` avec `std::error_code` (no-throw) avant `directory_iterator`. Si `./plugins/` n'existe pas → silencieux (attendu en Phase 0 avant T0.15).
+
+**Alternatives rejetées**
+- **`reinterpret_cast<FnPtr>(sym)` pour dlsym** : interdit par ISO C++ (violé par `-Wpedantic -Werror`). `memcpy` est l'alternative idiomatique documentée dans la FAQ POSIX.
+- **`RTLD_LAZY` au lieu de `RTLD_NOW`** : les symboles non résolus au load resteraient invisibles jusqu'au premier appel → crash en production au lieu d'une erreur lisible au démarrage.
+- **`RTLD_GLOBAL` au lieu de `RTLD_LOCAL`** : les symboles du plugin entrent dans l'espace global → risque de collision si deux plugins définissent une fonction portant le même nom. `RTLD_LOCAL` est plus sûr.
+- **`std::unique_ptr<void, decltype(&dlclose)>` comme handle** : `unique_ptr<void>` n'est pas légal (`void` n'est pas un type complet, `delete` sur `void*` est UB). Un wrapper struct ou un raw `void*` + boucle dans le destructeur sont les vraies options. Le raw `void*` + vector est plus lisible.
+- **Map par `std::string` seulement** : deux plugins de types différents avec le même nom (e.g. une `Primitive "sphere"` et une `Light "sphere"`) coexistent légitimement. La clé est bien `(kind, name)`.
+- **Singleton** : le loader est instancié et tenu en vie par `runScene()` / futur `main` — pas de singleton global. Testable, destructible proprement.
+- **Exceptions dans loadOne** : un plugin cassé ne doit pas couper court au scan des autres. Warnings sur `stderr` + continue est la politique correcte.
+- **`std::unordered_map` avec hash pour `pair<PluginKind, string>`** : O(1) vs O(log n) sur quelques dizaines de plugins → différence négligeable. `std::map` évite d'écrire un hash custom.
+
+**Impact**
+- **T0.10+** : `runScene()` dans `main.cpp` pourra instancier un `PluginLoader`, puis transmettre sa référence au `SceneBuilder` pour résoudre les types de plugins depuis le fichier `.cfg`.
+- **T0.15** (plugin factice sphère) : `PluginLoader("./plugins").find(Primitive, "sphere")` renvoie le descripteur après que `raytracer_sphere.so` a été chargé.
+- **`ldd ./raytracer`** : ne liste aucun `raytracer_*.so` → conforme Epitech. `libdl` est intégré à `libc` sur Ubuntu 22+ (pas visible dans `ldd` mais le link `-ldl` est présent et utile sur les systèmes plus anciens).
+- **Dette technique** : les plugins ne sont pas encore déchargés dans un ordre dépendant des scènes (ordre inverse de chargement est une heuristique). Si un plugin A alloue un objet de type défini par le plugin B, le destructeur de A doit tourner avant que B ne soit déchargé. Problème potentiel uniquement si on ajoute des plugins qui dépendent les uns des autres — hors scope pour l'instant.
+
+**Non couvert volontairement**
+- **Hot-reload** (bonus T4.18) : `dlclose` + `dlopen` sans redémarrer l'executable → ajouté quand SFML/preview sera implémenté.
+- **Chargement depuis des chemins configurables** (flag CLI `--plugin-dir`) → si besoin Phase 4.
+- **API d'énumération des plugins chargés** (`listAll()`) → pas encore nécessaire ; le `SceneBuilder` cherchera par `find()`.
+
+**Validation**
+```bash
+make re                                # 0 warning, libdl lié
+./raytracer --help; echo $?            # exit 0
+./raytracer; echo $?                   # exit 84
+ldd ./raytracer | grep raytracer_      # vide — aucun plugin linké en dur
+# Test du loader avec un faux .so :
+mkdir -p /tmp/fakepl && echo "garbage" > /tmp/fakepl/raytracer_fake.so
+./raytracer /tmp/valid.cfg 2>&1 | head  # warning dlopen lisible (si PluginLoader appelé)
+```
+Build 0 warning confirmé. RAII (dlclose LIFO) et 7 guards vérifiés par lecture de code. Regression CLI : aucune.
+
+---
 
 ### v0.0.9 — 2026-04-22 — ABI plugins : PluginDescriptor, RAYTRACER_ABI_VERSION (T0.8)
 

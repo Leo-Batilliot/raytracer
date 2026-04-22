@@ -13,15 +13,14 @@ add_executable(raytracer
     main.cpp
     math/Matrix4.cpp
     math/Transform.cpp
+    plugins/PluginLoader.cpp
 )
 
 target_link_libraries(raytracer
     PRIVATE
         rt_interfaces
+        dl          # dlopen / dlsym / dlclose (T0.9)
 )
 
-# The executable must NOT be linked against any plugin.
-# It will eventually link to:
-#   - libdl          (for dlopen/dlsym, via a PluginLoader wrapper)
-#   - libconfig++    (for scene parsing)
-# Both will be added when their respective modules land.
+# The executable must NOT be linked against any plugin .so.
+# libconfig++ will be added when the SceneParser lands (T0.10).
