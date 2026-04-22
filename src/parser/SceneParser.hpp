@@ -51,9 +51,12 @@ public:
 
     // Reads the optional `primitives` section and registers each
     // primitive with `builder` via the plugin registry `loader`.
-    // Missing section or unknown plugin kind is silently skipped.
     void parsePrimitives(SceneBuilder& builder,
                          const PluginLoader& loader) const;
+
+    // Reads the optional `lights` section and registers each light.
+    void parseLights(SceneBuilder& builder,
+                     const PluginLoader& loader) const;
 
 private:
     // Read a 3-component sub-group {x, y, z} from a Setting.

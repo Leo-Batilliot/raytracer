@@ -7,6 +7,7 @@
 #include <string>
 
 #include "core/Exceptions.hpp"
+#include "interfaces/ILight.hpp"
 #include "interfaces/IPrimitive.hpp"
 #include "interfaces/plugin_abi.hpp"
 #include "plugins/PluginLoader.hpp"
@@ -125,6 +126,43 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
 
     loadList("spheres", "sphere");  // T1.1
     loadList("planes",  "plane");   // T1.2
+}
+
+// ----------------------------------------------------------------
+// parseLights
+// ----------------------------------------------------------------
+
+void SceneParser::parseLights(SceneBuilder& builder,
+                               const PluginLoader& loader) const
+{
+    if (!config_.exists("lights")) return;
+
+    const libconfig::Setting& lights = config_.lookup("lights");
+
+    auto loadList = [&](const char* key, const char* kind) {
+        if (!lights.exists(key)) return;
+        const libconfig::Setting& list = lights[key];
+        const PluginDescriptor*  desc  = loader.find(PluginKind::Light, kind);
+        if (!desc) {
+            std::cerr << "raytracer: warning: " << kind
+                      << " light plugin not loaded — skipping " << key << '\n';
+            return;
+        }
+        for (int i = 0, n = list.getLength(); i < n; ++i) {
+            void* raw = desc->create(list[i]);
+            if (!raw) {
+                std::cerr << "raytracer: warning: " << kind << '[' << i
+                          << "]: create() failed — skipping\n";
+                continue;
+            }
+            auto* light = static_cast<ILight*>(raw);
+            builder.addLight(std::shared_ptr<ILight>(light,
+                [desc](ILight* l) { desc->destroy(l); }));
+        }
+    };
+
+    loadList("ambient",     "ambient");     // T1.3
+    loadList("directional", "directional"); // T1.4
 }
 
 }  // namespace rt

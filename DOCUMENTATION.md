@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.19 — 2026-04-22 — Plugin AmbientLight + parseLights (T1.3)](#v0019--2026-04-22--plugin-ambientlight--parselights-t13)
     - [v0.0.18 — 2026-04-22 — Plugin Plane, parsePrimitives générique (T1.2)](#v0018--2026-04-22--plugin-plane-parseprimitives-générique-t12)
     - [v0.0.17 — 2026-04-22 — Sphere réelle + PrimitiveNode + GroupNode (T1.1)](#v0017--2026-04-22--sphere-réelle--primitivenode--groupnode-t11)
     - [v0.0.16 — 2026-04-22 — Plugin factice sphere, fin Phase 0 (T0.15)](#v0016--2026-04-22--plugin-factice-sphere-fin-phase-0-t015)
@@ -107,6 +108,24 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.19 — 2026-04-22 — Plugin AmbientLight + parseLights (T1.3)
+
+**Type** : feature
+**Ticket** : T1.3
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- `plugins/ambient/AmbientPlugin.cpp` : `AmbientLight(Color contribution)`, `isAmbient()=true`, `ambientContribution()=contribution_`, `sample()` dummy. Config : `color {r,g,b}` × `intensity`.
+- `plugins/ambient/CMakeLists.txt` : `raytracer_ambient.so`.
+- `plugins/CMakeLists.txt` : `add_subdirectory(ambient)`.
+- `src/parser/SceneParser.hpp/.cpp` : `parseLights(builder, loader)` — lambda `loadList` symétrique à `parsePrimitives`. Supporte `ambient` (T1.3) et `directional` (T1.4 à venir).
+- `src/main.cpp` : appel `parser.parseLights(builder, loader)`.
+- `scenes/test_ambient.cfg` : sphère + plan + lumière ambiante (effet visible en T1.6).
+
+**Critère validé** : plugin chargé, exit 0, 0 warnings sur `test_ambient.cfg` et toutes les scènes précédentes.
+
+---
 
 ### v0.0.18 — 2026-04-22 — Plugin Plane, parsePrimitives générique (T1.2)
 

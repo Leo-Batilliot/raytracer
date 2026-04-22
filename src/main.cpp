@@ -93,6 +93,7 @@ void runScene(const std::filesystem::path& scenePath)
     rt::SceneBuilder builder;
     builder.setCamera(parser.parseCamera());
     parser.parsePrimitives(builder, loader);
+    parser.parseLights(builder, loader);
     rt::Scene scene = builder.build();
 
     // T0.14: render via the tile-based Renderer.

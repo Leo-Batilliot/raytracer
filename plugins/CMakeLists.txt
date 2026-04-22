@@ -19,5 +19,6 @@
 #   - T4.x  : phong, reflective, textured, ...
 # =====================================================================
 
-add_subdirectory(sphere)  # T1.1
-add_subdirectory(plane)   # T1.2
+add_subdirectory(sphere)   # T1.1
+add_subdirectory(plane)    # T1.2
+add_subdirectory(ambient)  # T1.3
