@@ -112,16 +112,37 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
             return;
         }
         for (int i = 0, n = list.getLength(); i < n; ++i) {
-            void* raw = desc->create(list[i]);
+            const libconfig::Setting& entry = list[i];
+            void* raw = desc->create(entry);
             if (!raw) {
                 std::cerr << "raytracer: warning: " << kind << '[' << i
                           << "]: create() failed — skipping\n";
                 continue;
             }
-            auto* prim = static_cast<IPrimitive*>(raw);
-            builder.addPrimitive(
-                std::shared_ptr<IPrimitive>(prim,
-                    [desc](IPrimitive* p) { desc->destroy(p); }));
+            auto prim = std::shared_ptr<IPrimitive>(
+                static_cast<IPrimitive*>(raw),
+                [desc](IPrimitive* p) { desc->destroy(p); });
+
+            // Optional material reference.
+            const IMaterial* mat = nullptr;
+            if (entry.exists("material")) {
+                const std::string matName =
+                    static_cast<const char*>(entry["material"]);
+                mat = builder.findMaterial(matName);
+                if (!mat) {
+                    std::cerr << "raytracer: warning: " << kind << '[' << i
+                              << "]: material '" << matName
+                              << "' not found — ignored\n";
+                }
+            }
+
+            // Optional translation.
+            Vector3 translate{};
+            if (entry.exists("translate")) {
+                translate = readVec3(entry["translate"]);
+            }
+
+            builder.addPrimitive(std::move(prim), mat, translate);
         }
     };
 

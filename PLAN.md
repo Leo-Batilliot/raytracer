@@ -202,7 +202,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 - [x] **T1.4** — Lumière **Directional** (plugin `.so`). Critère : `raytracer_directional.so` chargé, exit 0, 0 warnings.
 - [x] **T1.5** — Matériau **FlatColor** (plugin `.so`). Critère : `raytracer_flat_color.so` chargé, `parseMaterials` enregistre les matériaux dans `scene.materials()`, `test_flat_color.cfg` → exit 0, 0 warnings (✓).
 - [x] **T1.6** — Pipeline d'éclairage minimal dans le renderer (somme ambient + diffuse Lambert). Critère : `Renderer::shade()` = `albedo × (ambient + Σ Lambert)` ; sky gradient sur miss ; `test_flat_color.cfg` → sol blanc (255,255,248), ciel bleu (223,237,255), 0 warnings (✓).
-- [ ] **T1.7** — Parser complet (primitives, lumières, matériaux référencés par nom, translation).
+- [x] **T1.7** — Parser complet (primitives, lumières, matériaux référencés par nom, translation). Critère : sphère rouge (R=255,G≈130) + plan bleu (R≈124,G≈171,B=248) dans `test_flat_color.cfg` ; translation `test_translation.cfg` → sphère rouge à gauche, sphère verte à droite, 0 warnings (✓).
 - [ ] **T1.8** — Scènes de démo : `demo_sphere.cfg`, `demo_plane.cfg`, `demo_flat_color.cfg`, `light_ambient.cfg`, `light_directional.cfg`, `demo_translation.cfg`.
 
 **🏁 Fin de Phase 1** : `./raytracer scenes/demo_sphere.cfg` produit un PPM correct avec une sphère colorée éclairée. **MUST du sujet validé.**

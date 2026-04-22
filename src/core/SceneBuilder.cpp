@@ -21,11 +21,20 @@ SceneBuilder& SceneBuilder::setRoot(std::shared_ptr<INode> root)
     return *this;
 }
 
-SceneBuilder& SceneBuilder::addPrimitive(std::shared_ptr<IPrimitive> prim)
+SceneBuilder& SceneBuilder::addPrimitive(std::shared_ptr<IPrimitive> prim,
+                                          const IMaterial* mat,
+                                          Vector3 translate)
 {
     if (!group_) group_ = std::make_shared<GroupNode>();
-    group_->addChild(std::make_shared<PrimitiveNode>(std::move(prim)));
+    group_->addChild(
+        std::make_shared<PrimitiveNode>(std::move(prim), mat, translate));
     return *this;
+}
+
+const IMaterial* SceneBuilder::findMaterial(std::string_view name) const
+{
+    auto it = materials_.find(std::string(name));
+    return it != materials_.end() ? it->second.get() : nullptr;
 }
 
 SceneBuilder& SceneBuilder::addLight(std::shared_ptr<ILight> light)

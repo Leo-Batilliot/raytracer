@@ -23,6 +23,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "core/CameraConfig.hpp"
@@ -32,6 +33,7 @@
 #include "interfaces/IMaterial.hpp"
 #include "interfaces/INode.hpp"
 #include "interfaces/IPrimitive.hpp"
+#include "math/Vector3.hpp"
 
 namespace rt {
 
@@ -47,7 +49,11 @@ public:
 
     // Wrap prim in a PrimitiveNode and add it to the internal GroupNode.
     // The GroupNode becomes the scene root if no explicit root is set.
-    SceneBuilder& addPrimitive(std::shared_ptr<IPrimitive> prim);
+    // `mat`       — non-owning pointer into the materials_ map (may be null).
+    // `translate` — world-space offset applied via ray shifting in PrimitiveNode.
+    SceneBuilder& addPrimitive(std::shared_ptr<IPrimitive> prim,
+                               const IMaterial* mat     = nullptr,
+                               Vector3         translate = {});
 
     // Register a material under a scene-unique name.
     // The name is used in the .cfg file to associate a material to
@@ -55,6 +61,11 @@ public:
     // (last registration wins — matches libconfig override semantics).
     SceneBuilder& registerMaterial(std::string name,
                                    std::shared_ptr<IMaterial> mat);
+
+    // Look up a registered material by name. Returns nullptr if not found.
+    // Call after registerMaterial() (i.e. after parseMaterials) so the
+    // parser can resolve material names while building primitives.
+    const IMaterial* findMaterial(std::string_view name) const;
 
     // Validate and assemble the immutable Scene.
     // Throws rt::InvalidConfigError if the camera has not been set.

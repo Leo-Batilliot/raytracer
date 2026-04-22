@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.23 — 2026-04-22 — Parser complet : matériaux + translation (T1.7)](#v0023--2026-04-22--parser-complet--matériaux--translation-t17)
     - [v0.0.22 — 2026-04-22 — Pipeline d'éclairage minimal (T1.6)](#v0022--2026-04-22--pipeline-déclairage-minimal-t16)
     - [v0.0.21 — 2026-04-22 — Plugin FlatColor + parseMaterials (T1.5)](#v0021--2026-04-22--plugin-flatcolor--parsematerials-t15)
     - [v0.0.20 — 2026-04-22 — Plugin DirectionalLight (T1.4)](#v0020--2026-04-22--plugin-directionallight-t14)
@@ -111,6 +112,22 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.23 — 2026-04-22 — Parser complet : matériaux + translation (T1.7)
+
+**Type** : feature
+**Ticket** : T1.7
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- `src/core/PrimitiveNode.hpp` : ajout de `material_` (const IMaterial*, emprunt non-owning) et `translate_` (Vector3). `intersect()` décale `ray.origin` de -translate_ avant, remplace `rec.point` de +translate_ après, et écrit `rec.material = material_` si non-null.
+- `src/core/SceneBuilder.hpp/.cpp` : `addPrimitive()` reçoit `(prim, mat=nullptr, translate={})`. Ajout de `findMaterial(string_view)` → retourne le raw pointer depuis `materials_` (parseMaterials doit être appelé avant parsePrimitives).
+- `src/parser/SceneParser.cpp` : lambda `loadList` lit le champ optionnel `material` (name → `builder.findMaterial()`), lit le champ optionnel `translate {x,y,z}`, puis appelle `builder.addPrimitive(prim, mat, translate)`.
+- `scenes/test_translation.cfg` : sphère rouge et sphère verte, centre canonique `{0,0,0}`, positionnées via `translate`, sol bleu.
+
+**Critère validé** : sphère rouge R=255 G≈130 ; plan bleu R≈124 G≈171 B=248 dans `test_flat_color.cfg`. Dans `test_translation.cfg` : sphère rouge à gauche (x≈100-130), sphère verte à droite (x≈200-230). 0 warnings.
+
+---
 
 ### v0.0.22 — 2026-04-22 — Pipeline d'éclairage minimal (T1.6)
 
