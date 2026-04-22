@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.8 — 2026-04-22 — Interfaces publiques : IPrimitive, INode, ILight, IMaterial (T0.7)](#v008--2026-04-22--interfaces-publiques--iprimitive-inode-ilight-imaterial-t07)
     - [v0.0.7 — 2026-04-22 — Types POD partagés : Ray, HitRecord, ShadingContext, AABB (T0.6)](#v007--2026-04-22--types-pod-partagés--ray-hitrecord-shadingcontext-aabb-t06)
     - [v0.0.6 — 2026-04-22 — Math : Matrix4 + Transform (T0.5)](#v006--2026-04-22--math--matrix4--transform-t05)
     - [v0.0.5 — 2026-04-22 — Math : Vector2, Vector3, Color (T0.4)](#v005--2026-04-22--math--vector2-vector3-color-t04)
@@ -96,6 +97,78 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.8 — 2026-04-22 — Interfaces publiques : IPrimitive, INode, ILight, IMaterial (T0.7)
+
+**Type** : feature
+**Ticket** : T0.7
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Définition des quatre interfaces polymorphes centrales du pipeline : `rt::IPrimitive` (géométrie + UV), `rt::INode` (Composite, nœud de scene graph), `rt::ILight` + `rt::LightSample` (lumière + résultat d'échantillonnage), `rt::IMaterial` (Strategy, calcul de couleur). Introduction d'une cible CMake `rt_interfaces` (INTERFACE library) qui expose `src/` comme include root pour le core **et** les futurs plugins `.so`.
+
+**Contexte / motivation**
+T0.6 a posé les types POD partagés (`Ray`, `HitRecord`, `ShadingContext`, `AABB`). T0.7 pose le **contrat comportemental** au-dessus : les classes abstraites que le renderer utilise pour demander "intersecte-toi avec ce rayon" ou "calcule ta couleur". Ces interfaces sont la **frontière stable** entre le core et les plugins dynamiques — un plugin `.so` implémente `IPrimitive` ou `IMaterial` et n'a besoin de connaître que cette interface.
+
+Le `CMakeLists.txt` de `src/interfaces/` crée une `INTERFACE library` CMake (`rt_interfaces`) qui ne compile rien mais propage l'include path `src/`. Tout futur plugin écrira juste `target_link_libraries(raytracer_sphere PRIVATE rt_interfaces)` et aura accès à tous les types partagés sans redéfinir d'include path.
+
+**Détails techniques**
+
+- **`src/interfaces/IPrimitive.hpp`** — interface géométrique.
+  - `intersect(Ray, HitRecord&) → bool` : remplie `rec` sur hit (t, point, normal, uv, frontFace). Renvoie false sur miss sans modifier rec.
+  - `bounds() → AABB` : en **espace objet** (avant le Transform du nœud parent). Utilisé par le BVH.
+  - `uvAt(Vector3 localPoint) → Vector2` : paramétrisation de la surface. Séparé d'intersect pour ne pas calculer les UV quand le matériau n'en a pas besoin.
+- **`src/interfaces/INode.hpp`** — nœud de scene graph (Composite).
+  - `intersect(Ray, HitRecord&) → bool` : parcourt le sous-arbre, renvoie le hit **le plus proche** en espace monde.
+  - `bounds() → AABB` : en **espace monde** (post-transform). Le renderer et le BVH ne parlent qu'en espace monde.
+  - `addChild(shared_ptr<INode>)` : no-op par défaut (overridé par GroupNode). Permet au SceneBuilder d'ajouter des enfants sans downcast.
+- **`src/interfaces/ILight.hpp`** — lumière + `LightSample`.
+  - `LightSample { direction, radiance, distance }` : direction unitaire vers la lumière, radiance HDR incidente, distance pour borner les shadow rays (`tMax = distance`). Directional → `distance = +∞`.
+  - `sample(surfacePoint) → LightSample` : pure virtual.
+  - `isAmbient()` / `ambientContribution()` : défauts `false` / `black()`. Overridés par les lumières ambiantes seulement. Le renderer teste `isAmbient()` et appelle `ambientContribution()` une fois par point, séparément des lumières directionnelles.
+- **`src/interfaces/IMaterial.hpp`** — matériau (Strategy).
+  - `shade(ShadingContext) → Color` : pure virtual. Reçoit la scène entière (pour lancer des rayons secondaires), le hit record, le rayon entrant et le compteur de rebonds.
+  - Contrat de performance : allocation-free sur le stack (pas de heap dans le chemin shade).
+- **`src/interfaces/CMakeLists.txt`** — cible CMake INTERFACE.
+  - `add_library(rt_interfaces INTERFACE)` + `target_include_directories(rt_interfaces INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/..)` (= `src/`).
+  - Consommé par `target_link_libraries(raytracer PRIVATE rt_interfaces)` dans `src/CMakeLists.txt`.
+  - Les plugins l'utiliseront de la même façon (`target_link_libraries(raytracer_sphere PRIVATE rt_interfaces)` en T0.15).
+- **`src/CMakeLists.txt`** : ajout de `add_subdirectory(interfaces)` et `target_link_libraries(raytracer PRIVATE rt_interfaces)`. Le `target_include_directories(raytracer PRIVATE src/)` explicite peut maintenant être retiré puisque `rt_interfaces` expose la même path — maintenu implicitement via le lien INTERFACE.
+
+**Alternatives rejetées**
+- **Tout mettre dans un seul header `interfaces.hpp`** : les includes circulaires deviendraient inévitables rapidement (IPrimitive utilise AABB, INode utilise INode, etc.). Un header par classe = dépendances explicites et tracées.
+- **`IPrimitive` et `INode` fusionnés** : architecturalement erroné. Un IPrimitive est une géométrie pure (sphère unité, plan Z=0, cylindre canonique) ; un INode est une entité de scene graph avec un Transform, potentiellement enfants. Les séparer permet d'avoir plusieurs `IPrimitive`s partagées entre des `INode`s différents.
+- **Inclure `<memory>` partout** : `<memory>` n'est inclus que dans `INode.hpp` où `shared_ptr<INode>` est utilisé. Les autres headers n'en ont pas besoin.
+- **Rendre `addChild` pure virtual** : forcerait chaque implementer à déclarer une méthode vide. Le no-op default est plus ergonomique pour les leaf nodes, et la sémantique est documentée.
+- **Stocker `LightSample.direction` comme normalisation garantie par l'appelant** : c'est bien la convention retenue. Les plugins sont responsables de renvoyer une direction unitaire. Le renderer n'appelle pas `normalized()` sur le résultat (économie de sqrt dans les hot paths).
+- **Mettre `LightSample` dans un header séparé** : POD à 3 champs, utilisé uniquement avec `ILight`. Le grouper dans `ILight.hpp` évite un header de 10 lignes.
+- **CMake `add_library(rt_interfaces STATIC)` au lieu de `INTERFACE`** : aucun `.cpp` dans les interfaces → un STATIC target vide est une erreur CMake. L'INTERFACE library est exactement le bon outil pour les header-only dependencies.
+- **Propager l'include path via `target_include_directories` global** : anti-pattern CMake moderne. Chaque cible devrait déclarer ses dépendances explicitement via `target_link_libraries`.
+
+**Impact**
+- **T0.8** (ABI plugins) : `PluginDescriptor` peut maintenant référencer `IPrimitive`, `INode`, `ILight`, `IMaterial` par pointeur opaque — les types existent.
+- **T0.11** (SceneBuilder + Scene) : `Scene` peut stocker des `shared_ptr<INode>`, `shared_ptr<ILight>`, `shared_ptr<IMaterial>`.
+- **T0.15** (plugin factice sphère) : le plugin `raytracer_sphere.so` implémente `IPrimitive`, lie `rt_interfaces`, le core le charge et l'utilise via l'interface.
+- **T4.1** (Phong) : `IMaterial::shade()` reçoit `ShadingContext` qui contient la scène → les rayons secondaires (réflexion, ombres) sont lancés depuis shade.
+- **Dette technique** : aucune. La coupure core/plugin est propre et versionnée via `rt_interfaces`. Ajouter une méthode à une interface est un breaking change ABI → sera géré via `RAYTRACER_ABI_VERSION` (T0.8).
+
+**Non couvert volontairement**
+- **Implémentations concrètes** (`SphereNode`, `FlatColorMaterial`, etc.) → Phase 1.
+- **`Scene`** (pour que `ShadingContext::scene` soit utilisable) → T0.11.
+- **`LightSample::pdf`** (densité de probabilité pour Monte Carlo) → hors scope sujet, éventuel bonus avancé.
+- **`IEnvironment`** (lumière d'arrière-plan / sky) → éventuel bonus.
+
+**Validation**
+```bash
+make re                                # rebuild Release, 0 warning
+./raytracer --help; echo $?            # exit 0 — CLI intact
+./raytracer; echo $?                   # exit 84 — CliError intact
+./raytracer nope.cfg; echo $?          # exit 84 — IOError intact
+ldd ./raytracer | grep raytracer_      # vide → aucun plugin linké
+```
+Les 4 headers compilent avec stubs concrets sous `-Wall -Wextra -Werror -pedantic -std=c++20` (vérifié via fichier .cpp jetable — 0 warning). `rt_interfaces` apparaît dans le graphe CMake (`cmake --graphviz`). Aucune régression CLI.
+
+---
 
 ### v0.0.7 — 2026-04-22 — Types POD partagés : Ray, HitRecord, ShadingContext, AABB (T0.6)
 

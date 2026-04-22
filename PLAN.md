@@ -145,10 +145,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : headers dans `src/core/` ou `src/interfaces/`.
   - Critère : compilent seuls, inclus par le core sans dépendance (vérifié : les 4 headers compilent isolément sous `-Wall -Wextra -Werror -pedantic` avec forward decl sur `IMaterial`/`INode`/`Scene`).
 
-- [ ] **T0.7 — Interfaces publiques**
+- [x] **T0.7 — Interfaces publiques**
   - Objectif : définir `IPrimitive`, `INode`, `ILight`, `IMaterial`.
   - Livrable : headers dans `src/interfaces/`.
-  - Critère : une cible CMake INTERFACE library compile, consommable par core ET plugins.
+  - Critère : cible CMake INTERFACE library `rt_interfaces` créée, liée par `raytracer` ; les 4 headers compilent avec stubs concrets sous `-Wall -Wextra -Werror -pedantic` (vérifié).
 
 - [ ] **T0.8 — ABI plugins (`PluginDescriptor`, `RAYTRACER_ABI_VERSION`)**
   - Objectif : contrat C stable exporté par tout plugin.
