@@ -201,7 +201,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 - [x] **T1.3** — Lumière **Ambient** (plugin `.so`). Critère : `raytracer_ambient.so` chargé, `parseLights` enregistre la lumière dans `scene.lights()`, exit 0, 0 warnings.
 - [x] **T1.4** — Lumière **Directional** (plugin `.so`). Critère : `raytracer_directional.so` chargé, exit 0, 0 warnings.
 - [x] **T1.5** — Matériau **FlatColor** (plugin `.so`). Critère : `raytracer_flat_color.so` chargé, `parseMaterials` enregistre les matériaux dans `scene.materials()`, `test_flat_color.cfg` → exit 0, 0 warnings (✓).
-- [ ] **T1.6** — Pipeline d'éclairage minimal dans le renderer (somme ambient + diffuse lambert).
+- [x] **T1.6** — Pipeline d'éclairage minimal dans le renderer (somme ambient + diffuse Lambert). Critère : `Renderer::shade()` = `albedo × (ambient + Σ Lambert)` ; sky gradient sur miss ; `test_flat_color.cfg` → sol blanc (255,255,248), ciel bleu (223,237,255), 0 warnings (✓).
 - [ ] **T1.7** — Parser complet (primitives, lumières, matériaux référencés par nom, translation).
 - [ ] **T1.8** — Scènes de démo : `demo_sphere.cfg`, `demo_plane.cfg`, `demo_flat_color.cfg`, `light_ambient.cfg`, `light_directional.cfg`, `demo_translation.cfg`.
 

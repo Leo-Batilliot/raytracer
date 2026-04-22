@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.22 — 2026-04-22 — Pipeline d'éclairage minimal (T1.6)](#v0022--2026-04-22--pipeline-déclairage-minimal-t16)
     - [v0.0.21 — 2026-04-22 — Plugin FlatColor + parseMaterials (T1.5)](#v0021--2026-04-22--plugin-flatcolor--parsematerials-t15)
     - [v0.0.20 — 2026-04-22 — Plugin DirectionalLight (T1.4)](#v0020--2026-04-22--plugin-directionallight-t14)
     - [v0.0.19 — 2026-04-22 — Plugin AmbientLight + parseLights (T1.3)](#v0019--2026-04-22--plugin-ambientlight--parselights-t13)
@@ -110,6 +111,24 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.22 — 2026-04-22 — Pipeline d'éclairage minimal (T1.6)
+
+**Type** : feature
+**Ticket** : T1.6
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- `src/core/Renderer.cpp` : `shade()` remplace la visu de normales par le pipeline physique :
+  1. Miss → sky gradient (inchangé)
+  2. Hit → albedo via `rec.material->shade(ShadingContext)` ou `Color::white()` si pas de matériau (T1.7 l'assignera)
+  3. Accumulation ambient : somme des `light->ambientContribution()` sur les lumières `isAmbient()`
+  4. Accumulation diffuse Lambert : pour chaque lumière non-ambiante, `ls = light->sample(rec.point)`, contribution = `ls.radiance × max(0, normal·ls.direction)`
+  5. Résultat = `albedo × (ambient + diffuse)`
+
+**Critère validé** : sol (255,255,248) = Lambert fort + ambient ; ciel bleu (223,237,255) ; 0 warnings.
+
+---
 
 ### v0.0.21 — 2026-04-22 — Plugin FlatColor + parseMaterials (T1.5)
 
