@@ -17,6 +17,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.7 — 2026-04-22 — Types POD partagés : Ray, HitRecord, ShadingContext, AABB (T0.6)](#v007--2026-04-22--types-pod-partagés--ray-hitrecord-shadingcontext-aabb-t06)
     - [v0.0.6 — 2026-04-22 — Math : Matrix4 + Transform (T0.5)](#v006--2026-04-22--math--matrix4--transform-t05)
     - [v0.0.5 — 2026-04-22 — Math : Vector2, Vector3, Color (T0.4)](#v005--2026-04-22--math--vector2-vector3-color-t04)
     - [v0.0.4 — 2026-04-21 — Hiérarchie d'exceptions du domaine (T0.3.1)](#v004--2026-04-21--hiérarchie-dexceptions-du-domaine-t031)
@@ -28,6 +29,7 @@
     - [Choix techniques clés (v0.0.1)](#choix-techniques-clés-v001)
     - [Gestion d'erreurs (v0.0.4)](#gestion-derreurs-v004)
     - [Math : conventions (v0.0.5)](#math--conventions-v005)
+    - [Types POD d'échange core/plugins (v0.0.7)](#types-pod-déchange-coreplugins-v007)
   - [Features documentées](#features-documentées)
     - [Primitives](#primitives)
     - [Lumières](#lumières)
@@ -91,6 +93,88 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.7 — 2026-04-22 — Types POD partagés : Ray, HitRecord, ShadingContext, AABB (T0.6)
+
+**Type** : feature
+**Ticket** : T0.6
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Introduction des quatre types POD qui forment le **vocabulaire commun** du pipeline de rendu — utilisés identiquement par le core et par les plugins : `rt::Ray` (rayon paramétrique), `rt::HitRecord` (résultat d'intersection), `rt::ShadingContext` (bundle remis à `IMaterial::shade`), `rt::AABB` (bounding box axis-aligned). Tous résident dans `src/interfaces/` pour signifier leur statut d'**interface d'échange** entre les modules.
+
+**Contexte / motivation**
+Le pipeline de rendu s'articule autour d'un enchaînement standard : un rayon traverse la scène → chaque primitive rapporte son intersection éventuelle via `intersect(Ray, HitRecord&)` → la plus proche des hits est sélectionnée → le matériau du hit est interrogé via `shade(ShadingContext)` pour produire une couleur. Avant d'écrire les interfaces `IPrimitive`/`INode`/`ILight`/`IMaterial` (T0.7), ces quatre types doivent exister sous forme **stable, POD, minimale** :
+- **POD** : ils traversent la frontière ABI core ↔ plugins sans gymnastique (pas de méthodes virtuelles, pas de layout dépendant du compilateur).
+- **Headers self-contained** : chaque type doit pouvoir être inclus isolément sans tirer des dépendances cycliques. `IMaterial`, `INode`, `Scene` arrivent en T0.7/T0.11 → forward declarations.
+- **Placement dans `src/interfaces/`** : ce dossier est la **seule surface d'API publique** vue par les plugins ; le placer ici verrouille sa stabilité.
+
+`Ray` embarque déjà l'intervalle paramétrique `[tMin, tMax]` (utilisé par le BVH bonus T3.3 et par les shadow rays) et un epsilon partagé pour éviter la self-intersection. `HitRecord` porte les pointeurs non-propriétaires vers le matériau et le nœud, qui sont owned par la Scene (convention verrouillée dès T0.1). `AABB` adopte le sentinel inversé (+∞ / −∞) qui rend `expanded()` et `merged()` triviaux. `ShadingContext` est bâti sur la pile à chaque appel — aucune copie, aucune ownership, uniquement des références const.
+
+**Détails techniques**
+
+- **`src/interfaces/Ray.hpp`** — POD rayon paramétrique.
+  - Champs : `origin` (Vector3), `direction` (Vector3, **unit attendu** — non vérifié par le type ; les constructeurs de rayons dans `Camera`/shadow/reflexion se chargent de la normalisation).
+  - Intervalle : `tMin = kRayEpsilon` (petit offset positif qui évite qu'un rayon réfléchi/réfracté ré-intersecte immédiatement sa surface d'origine), `tMax = +∞`.
+  - Constante partagée : `inline constexpr double kRayEpsilon = 1e-4;`. Le choix de `1e-4` est un compromis : assez grand pour absorber les erreurs d'arrondi double sur des scènes d'échelle unitaire, assez petit pour ne pas créer de "gap" visible quand deux surfaces sont tangentes.
+  - Helper `at(t)` : `constexpr noexcept` — `origin + t * direction`.
+- **`src/interfaces/HitRecord.hpp`** — résultat POD d'intersection.
+  - Champs : `t` (paramètre du rayon au hit), `point` (position monde), `normal` (unitaire, espace monde), `uv` (paramétrisation surface pour texturing), `material` (`const IMaterial*`, non-propriétaire), `node` (`const INode*`, non-propriétaire), `frontFace` (bool — face extérieure ou intérieure, rempli par la primitive).
+  - **Forward declarations** : `class IMaterial;` et `class INode;` — leurs définitions arrivent en T0.7. Le header reste self-contained.
+  - **Ownership explicite** : le commentaire en tête mentionne "raw pointers NON-OWNING into the Scene" pour écarter toute ambiguïté (pas de `delete` à faire).
+- **`src/interfaces/ShadingContext.hpp`** — bundle remis au matériau.
+  - Champs : `const Scene&`, `const HitRecord&`, `const Ray& incomingRay`, `int depth = 0`.
+  - **Forward declaration** : `class Scene;` — sa définition arrive en T0.11.
+  - Construit **toujours sur la pile** au site d'appel de `shade()`, jamais stocké → pas de constructeur par défaut, pas de copie.
+  - `depth` compte les rebonds récursifs (0 pour un rayon primaire, 1 pour la première réflexion/réfraction…). Permet aux matériaux de stopper la récursion (cf. T4.1/T4.2).
+- **`src/interfaces/AABB.hpp`** — bounding box axis-aligned.
+  - Champs : `Vector3 min`, `Vector3 max`.
+  - **Constructeur par défaut = boîte VIDE sentinel** : `min = (+∞, +∞, +∞)`, `max = (−∞, −∞, −∞)`. Cette convention rend `expanded(p)` correct dès le premier appel dans une boucle d'expansion (`for (p : points) b = b.expanded(p);` donne toujours une boîte finie et bien ordonnée à la sortie).
+  - Constructeur explicite `AABB(min, max)` pour construire directement une boîte connue.
+  - `isEmpty()` : `true` ssi `min.x > max.x || min.y > max.y || min.z > max.z` — le sentinel le satisfait sur les trois axes.
+  - `expanded(Vector3)` : retourne une nouvelle AABB étendue pour inclure `p` (composantwise `min`/`max`).
+  - `merged(AABB)` : union de deux boîtes.
+  - Toutes les méthodes sont `constexpr noexcept`.
+- **Pas de `.cpp`** : les quatre types sont header-only (POD + ops `constexpr`).
+- **Pas de modif CMake** : l'include path `src/` existant couvre `src/interfaces/`. Aucun symbole à exporter, pas de lib dédiée (ce sera T0.7 pour la "`interfaces` INTERFACE library").
+- **Vérification de compilation** : chaque header a été compilé isolément sous `-Wall -Wextra -Werror -pedantic -std=c++20` (petit fichier jetable incluant les quatre + instanciant chaque type, hors repo) — 0 warning. Les forward declarations suffisent pour un `Ray`/`HitRecord`/`ShadingContext`/`AABB` standalone ; les vraies définitions de `IMaterial`/`INode`/`Scene` seront nécessaires pour **utiliser** ces pointeurs (mais pas pour compiler les POD).
+
+**Alternatives rejetées**
+- **Placer ces types dans `src/core/`** : sémantique erronée. `src/core/` = runtime interne (Scene, SceneBuilder, Renderer, Camera). `src/interfaces/` = contrat public partagé avec les plugins. Ces quatre types sont consommés par les plugins (intersect renvoie `HitRecord`, shade reçoit `ShadingContext`, bounds renvoie `AABB`) → ils appartiennent à l'interface.
+- **Faire de `HitRecord` / `ShadingContext` des classes avec constructeurs / invariants** : inutile. Ce sont des bundles construits et remplis sur la pile, jamais stockés ; aucun invariant à protéger. Un `struct` POD avec champs publics est le design idiomatique pour un DTO de hot path (cf. `std::pair`, `std::optional`).
+- **Intégrer `material` et `node` par `shared_ptr` dans `HitRecord`** : surcoût prohibitif (atomic increment/decrement sur chaque intersection). Les primitives et les nœuds sont owned par la `Scene` (elle-même immutable après construction) → les raw pointers sont sûrs tant que le `HitRecord` ne survit pas à la Scene. La documentation en tête de header rend cette convention explicite.
+- **Stocker l'ownership de `material` dans `HitRecord` via `weak_ptr`** : idem — pattern non justifié quand la Scene garantit la durée de vie.
+- **Stocker `Scene&` par pointeur dans `ShadingContext`** : les références expriment mieux le non-null invariant à la construction. `ShadingContext` n'est jamais reconstruit ; une référence est strictement supérieure à un pointeur ici.
+- **Remplacer `tMin`/`tMax` par un `Interval` séparé** : overkill pour 2 `double`. L'abstraction viendrait polluer tout le code de ray spawning sans gain.
+- **Initialiser `frontFace` à `false`** : convention arbitraire ; `true` est cohérent avec la majorité des rayons primaires (on hit la face avant d'un objet). Les primitives écrasent cette valeur de toute façon, donc la valeur par défaut n'a qu'un rôle de doc.
+- **Stocker `Color emission` ou `double roughness` dans `HitRecord`** : ces données appartiennent au matériau (accessible via `material->...`). `HitRecord` reste minimal — c'est ce que le **rayon** a rapporté, pas ce que la **surface** stocke.
+- **Utiliser un bitset pour des flags futurs (inside/outside, emissive)** : spéculation. On ajoutera un flag quand un use-case concret l'exigera.
+- **`AABB` empty = `{0,0,0}, {0,0,0}`** : piège classique — `expanded((1,1,1))` donnerait `{{0,0,0},{1,1,1}}`, mais si tous les points sont négatifs, `min` resterait à `(0,0,0)` (faux). Le sentinel `(+∞,−∞)` est universellement correct.
+
+**Impact**
+- **T0.7** peut maintenant définir `IPrimitive::intersect(const Ray&, HitRecord&) const` et `IMaterial::shade(const ShadingContext&) const` sans définir de nouveau type au passage.
+- **T0.8** (ABI plugins) : ces POD sont les seuls types "hors primitive C" qui peuvent traverser la frontière `extern "C"` de façon stable — leur simplicité garantit l'ABI.
+- **T1.1+** (primitives) : chaque plugin remplit un `HitRecord` et retourne une `AABB` — le vocabulaire est prêt.
+- **T3.3** (BVH bonus) : `AABB::merged` est l'opération centrale du build récursif.
+- **Dette technique** : aucune. Les types sont minimaux, non-propriétaires, et leurs conventions sont documentées en tête de chaque header.
+
+**Non couvert volontairement**
+- **Intersection `AABB ↔ Ray`** (slab method) : utile pour le BVH (T3.3). Sera ajouté comme méthode `AABB::intersect(Ray, double& tHit)` quand le BVH arrivera — garder le type minimal jusque-là évite les anticipations inutiles.
+- **`HitRecord::isHit()`** / champ `bool hit` : inutile — la signature `intersect(Ray, HitRecord&) -> bool` porte déjà le statut. Le `HitRecord` n'a de sens que si `true` est retourné.
+- **Tracking du médium traversé** (indice de réfraction courant, volumes participatifs) : hors scope Phase 0. Sera ajouté si/quand les bonus refraction/volumes le demandent.
+- **Validation automatique** (compilation isolée via CTest, asserts d'invariants sur `AABB`) : reportée au ticket framework de tests. La compilation isolée a été vérifiée manuellement via un fichier jetable (non commité).
+
+**Validation**
+```bash
+make re                               # rebuild Release, 0 warning
+./raytracer --help; echo $?           # exit 0 — CLI intact
+./raytracer; echo $?                  # exit 84 — CliError intact
+./raytracer nope.cfg; echo $?         # exit 84 — IOError intact
+ldd ./raytracer | grep raytracer_     # vide → aucun plugin linké
+```
+Les quatre headers compilent seuls sous `-Wall -Wextra -Werror -pedantic -std=c++20` (vérifié via un fichier .cpp jetable hors repo, incluant chacun en isolation puis les quatre ensemble — 0 warning). Aucune régression CLI. Critère d'acceptation T0.6 (compilent seuls, inclus sans dépendance cyclique grâce aux forward decls) **satisfait structurellement**.
+
+---
 
 ### v0.0.6 — 2026-04-22 — Math : Matrix4 + Transform (T0.5)
 
@@ -531,6 +615,16 @@ En réserve bonus : Observer (hot-reload), Decorator (empilement d'effets sur ma
 - **Validation runtime** : aucune validation automatique embarquée dans le code. Les tests manuels introduits en v0.0.5 (`src/math/sanity.hpp`) ont été retirés : la validation formelle passera par GoogleTest + CTest dans un ticket dédié, pas par des asserts ad-hoc dans le source.
 - **Matrices** : `Matrix4` row-major, stockée flat en `std::array<double, 16>`, default = identité. Accès par `M(row, col)`. Multiplication, transposée, inversion (Gauss-Jordan + pivot partiel, lève `MathError` sur singulière).
 - **Transform** : tient matrice + **inverse pré-calculé**. Factories analytiques (`translation`/`scaling`/`rotation*`) construisent l'inverse exactement (négation, réciproque, transposée) ; le constructeur générique `Transform(Matrix4)` appelle `Matrix4::inverse()` numérique. `applyToNormal` utilise `(M⁻¹)ᵀ` pour gérer correctement les scales non uniformes. `Transform::inverse()` est gratuit (swap des deux matrices stockées).
+
+### Types POD d'échange core/plugins (v0.0.7)
+
+- **Emplacement** : `src/interfaces/` (surface d'API publique partagée avec les plugins, par opposition à `src/core/` qui est le runtime interne).
+- **`Ray`** : `{origin, direction, tMin, tMax}`, `direction` unitaire par convention (non vérifié par le type). `tMin` par défaut = `kRayEpsilon = 1e-4` pour éviter la self-intersection des rayons réfléchis/réfractés. Helper `at(t) = origin + t*direction`.
+- **`HitRecord`** : `{t, point, normal, uv, material*, node*, frontFace}`. POD copiable librement. Les pointeurs `IMaterial*` et `INode*` sont **non-propriétaires** — la Scene owne leurs cibles via `shared_ptr`. `frontFace` est rempli par la primitive en comparant `dot(normal, ray.dir)`.
+- **`ShadingContext`** : `{const Scene&, const HitRecord&, const Ray&, int depth}`. Construit sur la pile au site d'appel de `shade()`, jamais stocké. `depth` borne la récursion (réflexion/réfraction).
+- **`AABB`** : `{Vector3 min, Vector3 max}`. **Empty sentinel** : default-constructed = `min = (+∞,+∞,+∞)`, `max = (−∞,−∞,−∞)` → `expanded()` et `merged()` sont corrects par construction, même sur la première itération d'une boucle d'expansion.
+- **Règles de compilation** : headers self-contained — `IMaterial`, `INode`, `Scene` en **forward declaration** car définis plus tard (T0.7, T0.11).
+- **Pas d'exceptions dans ces types** : ils sont utilisés dans les hot paths (intersect, shade). La gestion d'erreurs reste aux frontières (T0.3.1).
 
 ---
 

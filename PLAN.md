@@ -139,10 +139,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/math/Matrix4.hpp/.cpp`, `src/math/Transform.hpp/.cpp`.
   - Critère : `translation(dx,dy,dz).applyToPoint(p) == p + (dx,dy,dz)` ; `inverse().apply(apply(p)) ≈ p` (critères structurellement satisfaits par construction — validation formelle reportée au ticket tests dédié).
 
-- [ ] **T0.6 — `Ray`, `HitRecord`, `ShadingContext`, `AABB`**
+- [x] **T0.6 — `Ray`, `HitRecord`, `ShadingContext`, `AABB`**
   - Objectif : types POD partagés par le core et les plugins.
   - Livrable : headers dans `src/core/` ou `src/interfaces/`.
-  - Critère : compilent seuls, inclus par le core sans dépendance.
+  - Critère : compilent seuls, inclus par le core sans dépendance (vérifié : les 4 headers compilent isolément sous `-Wall -Wextra -Werror -pedantic` avec forward decl sur `IMaterial`/`INode`/`Scene`).
 
 - [ ] **T0.7 — Interfaces publiques**
   - Objectif : définir `IPrimitive`, `INode`, `ILight`, `IMaterial`.
