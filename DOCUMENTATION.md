@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.9 — 2026-04-22 — ABI plugins : PluginDescriptor, RAYTRACER_ABI_VERSION (T0.8)](#v009--2026-04-22--abi-plugins--plugindescriptor-raytracer_abi_version-t08)
     - [v0.0.8 — 2026-04-22 — Interfaces publiques : IPrimitive, INode, ILight, IMaterial (T0.7)](#v008--2026-04-22--interfaces-publiques--iprimitive-inode-ilight-imaterial-t07)
     - [v0.0.7 — 2026-04-22 — Types POD partagés : Ray, HitRecord, ShadingContext, AABB (T0.6)](#v007--2026-04-22--types-pod-partagés--ray-hitrecord-shadingcontext-aabb-t06)
     - [v0.0.6 — 2026-04-22 — Math : Matrix4 + Transform (T0.5)](#v006--2026-04-22--math--matrix4--transform-t05)
@@ -97,6 +98,76 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.9 — 2026-04-22 — ABI plugins : PluginDescriptor, RAYTRACER_ABI_VERSION (T0.8)
+
+**Type** : feature
+**Ticket** : T0.8
+**Phase** : 0 (Fondations)
+
+**Résumé**
+Introduction de `src/interfaces/plugin_abi.hpp` : le contrat C-linkage que tout plugin `.so` exporte. Définit `RAYTRACER_ABI_VERSION`, l'enum `PluginKind`, le POD `PluginDescriptor`, la signature `extern "C" raytracer_plugin_entry()` et la macro `RAYTRACER_PLUGIN_ENTRY` pour simplifier l'écriture d'un plugin.
+
+**Contexte / motivation**
+Le PluginLoader (T0.9) chargera des `.so` avec `dlopen`/`dlsym`. Pour trouver le code du plugin, il cherche le symbole `raytracer_plugin_entry` — un pointeur de fonction C (pas de mangling) qui renvoie un `PluginDescriptor`. Ce descriptor est le **seul point d'entrée** du plugin ; il contient tout ce dont le core a besoin : type de plugin, nom, fabrique, destructeur.
+
+Plusieurs contraintes à concilier :
+- **Stabilité ABI** : si le format de `PluginDescriptor` change un jour, les anciens `.so` ne doivent pas crasher — ils doivent être rejetés proprement. D'où `abi_version` vérifié à load-time par le PluginLoader.
+- **Pas d'exceptions inter-boundary** : une exception qui traverserait `dlopen` provoquerait un comportement indéfini (stack unwinding incompatible). La convention est que `create`/`destroy` capturent tout en interne.
+- **Légèreté** : `plugin_abi.hpp` est le seul header du core que les plugins doivent obligatoirement inclure. On ne veut pas y tirer toute la STL. Forward-declaration de `libconfig::Setting` suffit.
+
+**Détails techniques**
+
+- **`RAYTRACER_ABI_VERSION = 1`** : `inline constexpr uint32_t` dans `namespace rt`. Le PluginLoader (T0.9) compare `desc->abi_version == RAYTRACER_ABI_VERSION` ; mismatch → warning stderr + rejet propre (pas de `std::terminate`).
+- **`PluginKind : uint32_t`** : enum class à underlying type fixe — taille garantie (`sizeof == 4`) quel que soit le compilateur ou la plateforme. Valeurs : `Primitive = 0`, `Light = 1`, `Material = 2`. Ajout futur (e.g. `PostProcess = 3`) = breaking change → bump ABI.
+- **`PluginDescriptor`** : POD agrégat.
+  - `abi_version` : rempli par la macro, jamais hardcodé à la main par le plugin.
+  - `kind` : le PluginLoader l'utilise pour caster `create()` → `IPrimitive*` / `ILight*` / `IMaterial*`.
+  - `name` : `const char*` litéral (duration statique). Clé de lookup dans le registre (kind, name) du PluginLoader et dans le fichier `.cfg`. Convention : lowercase ASCII, underscore pour les espaces (e.g. `"flat_color"`).
+  - `create(const libconfig::Setting&) → void*` : fabrique héap. Le bloc `libconfig::Setting` vient directement du parser (T0.10) — le plugin lit ses paramètres depuis la config sans que le core sache ce qu'il lit.
+  - `destroy(void*)` : appelé à la destruction de la Scene. Ne doit pas throw.
+- **Forward-decl `libconfig::Setting`** : `namespace libconfig { class Setting; }` dans le header — le type est utilisé dans une signature de pointeur de fonction, ce qui ne nécessite pas la définition complète. Évite de tirer `<libconfig.h++>` dans le header partagé.
+- **`extern "C" raytracer_plugin_entry()`** : déclaré hors de `namespace rt` (les symboles `extern "C"` vivent dans l'espace global). Le `extern "C"` supprime le mangling → `dlsym("raytracer_plugin_entry")` trouve le symbole indépendamment du compilateur.
+- **Macro `RAYTRACER_PLUGIN_ENTRY(kind, name, create, destroy)`** : génère la définition complète de `raytracer_plugin_entry()` avec `abi_version` rempli automatiquement. Usage typique dans un plugin :
+  ```cpp
+  RAYTRACER_PLUGIN_ENTRY(rt::PluginKind::Primitive, "sphere",
+                         &SpherePlugin::create, &SpherePlugin::destroy)
+  ```
+  Avantage : le plugin auteur ne peut pas oublier de mettre à jour `abi_version` manuellement.
+- **Aucune modification CMake** : `plugin_abi.hpp` est dans `src/interfaces/`, déjà exposé par `rt_interfaces` (T0.7). Les futurs plugins lieront simplement `rt_interfaces` pour l'obtenir.
+
+**Alternatives rejetées**
+- **Utiliser `std::string_view` pour `name`** : `std::string_view` a un layout défini par l'ABI C++ (dépend du compilateur/stdlib), et pointer dans une string_view vers un litéral statique introduit une dépendance subtile. `const char*` litéral est la convention C portable et universellement comprise.
+- **Faire `PluginKind` un `enum` (non scoped)** : `enum class` avec underlying type fixe garantit la taille. Un `enum` non-scoped aurait un underlying type dépendant du compilateur.
+- **Mettre le `name` dans un `std::string` membre** : POD non trivial, pas copiable bit-à-bit → hors spec ABI stable.
+- **Un symbole exporté différent par type** (`raytracer_primitive_entry`, `raytracer_light_entry`…) : multiplie les points d'entrée ; le PluginLoader doit tenter plusieurs `dlsym`. Un seul `raytracer_plugin_entry` est plus simple.
+- **Inclure `<libconfig.h++>` directement** : alourdit le header partagé, force tous les plugins à compiler avec les headers libconfig installés au bon endroit. La forward-declaration suffit pour déclarer le pointeur de fonction.
+- **`std::function<void*(const libconfig::Setting&)>` au lieu de `void*(*)(...)` raw** : `std::function` n'est pas POD, a un layout dépendant de l'implémentation, et introduit un overhead de type erasure inutile.
+- **Exceptions dans `create`/`destroy`** : traverser la frontière `dlopen` avec une exception = UB en C++ (deux bibliothèques C++ potentiellement différentes, stacks de déwinding incompatibles). `nullptr` + log stderr est la convention.
+- **Pas de macro `RAYTRACER_PLUGIN_ENTRY`** : sans la macro, chaque plugin hardcoderait `abi_version = 1`. Quand la version bumpe à `2`, tous les plugins compilés sans recompilation renverraient `1` → rejet correct par le loader. Mais l'auteur qui oublie de recompiler voit son plugin silencieusement rejeté sans savoir pourquoi. La macro compile `RAYTRACER_ABI_VERSION` dans le `.so` → la version dans le binaire reflète toujours celle des headers avec lesquels il a été compilé.
+
+**Impact**
+- **T0.9** (PluginLoader) : `dlsym("raytracer_plugin_entry")` retourne `const rt::PluginDescriptor*`. Le loader caste vers le bon type selon `kind`, vérifie `abi_version`.
+- **T0.15** (plugin factice sphère) : `RAYTRACER_PLUGIN_ENTRY(Primitive, "sphere", ...)` — 5 lignes pour définir l'entry point.
+- **Toute la Phase 1** : chaque plugin de la Phase 1 est structuré autour de ce contrat. L'ajouter en Phase 0 garantit qu'il n'y aura pas de refactor.
+- **`ldd ./raytracer`** : le binary ne lie pas `libconfig++` encore — le loader l'utilisera en T0.9. Pas de régression.
+
+**Non couvert volontairement**
+- **ABI version check** (rejet à load-time) → T0.9 (PluginLoader).
+- **`PluginKind::Node`** pour des nœuds de scene graph exportés par plugin → hors scope sujet. Le Composite pattern vit dans le core.
+- **Chargement de plusieurs descriptors depuis un seul `.so`** (un `.so` qui fournit plusieurs primitives) → non supporté. Un `.so` = un `raytracer_plugin_entry` = un type. Architecture plus simple.
+- **Hot-reload** → bonus T4.18. L'ABI est stable pour le permettre, mais le PluginLoader ne l'implémente pas encore.
+
+**Validation**
+```bash
+make re                                # rebuild Release, 0 warning
+./raytracer --help; echo $?            # exit 0
+./raytracer; echo $?                   # exit 84
+ldd ./raytracer | grep raytracer_      # vide → aucun plugin linké
+```
+`plugin_abi.hpp` compilé avec un plugin simulé (macro + create/destroy) ET du côté core (include avec les 4 interfaces) sous `-Wall -Wextra -Werror -pedantic -std=c++20` — 0 warning. `static_assert(rt::RAYTRACER_ABI_VERSION == 1)` vérifié.
+
+---
 
 ### v0.0.8 — 2026-04-22 — Interfaces publiques : IPrimitive, INode, ILight, IMaterial (T0.7)
 

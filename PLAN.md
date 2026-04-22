@@ -150,10 +150,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : headers dans `src/interfaces/`.
   - Critère : cible CMake INTERFACE library `rt_interfaces` créée, liée par `raytracer` ; les 4 headers compilent avec stubs concrets sous `-Wall -Wextra -Werror -pedantic` (vérifié).
 
-- [ ] **T0.8 — ABI plugins (`PluginDescriptor`, `RAYTRACER_ABI_VERSION`)**
+- [x] **T0.8 — ABI plugins (`PluginDescriptor`, `RAYTRACER_ABI_VERSION`)**
   - Objectif : contrat C stable exporté par tout plugin.
   - Livrable : `src/interfaces/plugin_abi.hpp`.
-  - Critère : header inclus par core ET plugin factice, ABI version définie.
+  - Critère : `RAYTRACER_ABI_VERSION = 1` défini ; `PluginDescriptor` + macro `RAYTRACER_PLUGIN_ENTRY` compilent des deux côtés (core et plugin simulé) sous `-Wall -Wextra -Werror -pedantic` (vérifié).
 
 - [ ] **T0.9 — `PluginLoader` (encapsulation `libdl`)**
   - Objectif : seul endroit avec `dlopen`/`dlsym`/`dlclose`, RAII strict.
