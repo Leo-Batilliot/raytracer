@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.27 — 2026-04-23 — Rotation via Transform (T2.3)](#v0027--2026-04-23--rotation-via-transform-t23)
     - [v0.0.26 — 2026-04-23 — Plugin Cone (T2.2)](#v0026--2026-04-23--plugin-cone-t22)
     - [v0.0.25 — 2026-04-23 — Plugin Cylinder (T2.1)](#v0025--2026-04-23--plugin-cylinder-t21)
     - [v0.0.24 — 2026-04-22 — Scènes de démo Phase 1 (T1.8)](#v0024--2026-04-22--scènes-de-démo-phase-1-t18)
@@ -115,6 +116,23 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.27 — 2026-04-23 — Rotation via Transform (T2.3)
+
+**Type** : feature
+**Ticket** : T2.3
+**Phase** : 2 (SHOULD)
+
+**Ce qui a changé** :
+- `src/core/PrimitiveNode.hpp` : `Transform transform_` + `Transform inverseTransform_` (cached) remplacent l'ancien `Vector3 translate_`. Le rayon est transformé en espace objet via l'inverse, le point/normale de hit sont transformés en espace monde via la forward transform. Règle normale : `(M⁻¹)ᵀ·n` via `transform_.applyToNormal()`.
+- `src/core/SceneBuilder.hpp/.cpp` : `addPrimitive(prim, mat, Transform)` — `Transform::identity()` par défaut (rétrocompatible).
+- `src/parser/SceneParser.cpp` : lecture du champ optionnel `rotate = { x; y; z; }` (degrés), composition X→Y→Z (intrinsèque) ; `translation * rotation` passé à `addPrimitive`.
+- `scenes/test_rotation.cfg` (320×240) : cylindre cobalt horizontal (rotZ=90°) + cône amber incliné (rotX=30°).
+- `scenes/demo_rotation.cfg` (800×600) : showcase rotation riche.
+
+**Critère validé** : cylindre cobalt horizontal (2 194 px bleus, x:112..207) + cône amber incliné (542 px ambrés, x:93..112) dans `test_rotation.cfg`, exit 0, 0 warnings.
+
+---
 
 ### v0.0.26 — 2026-04-23 — Plugin Cone (T2.2)
 

@@ -23,11 +23,11 @@ SceneBuilder& SceneBuilder::setRoot(std::shared_ptr<INode> root)
 
 SceneBuilder& SceneBuilder::addPrimitive(std::shared_ptr<IPrimitive> prim,
                                           const IMaterial* mat,
-                                          Vector3 translate)
+                                          Transform transform)
 {
     if (!group_) group_ = std::make_shared<GroupNode>();
     group_->addChild(
-        std::make_shared<PrimitiveNode>(std::move(prim), mat, translate));
+        std::make_shared<PrimitiveNode>(std::move(prim), mat, std::move(transform)));
     return *this;
 }
 

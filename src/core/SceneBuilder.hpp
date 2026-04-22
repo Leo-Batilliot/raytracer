@@ -33,7 +33,7 @@
 #include "interfaces/IMaterial.hpp"
 #include "interfaces/INode.hpp"
 #include "interfaces/IPrimitive.hpp"
-#include "math/Vector3.hpp"
+#include "math/Transform.hpp"
 
 namespace rt {
 
@@ -50,10 +50,11 @@ public:
     // Wrap prim in a PrimitiveNode and add it to the internal GroupNode.
     // The GroupNode becomes the scene root if no explicit root is set.
     // `mat`       — non-owning pointer into the materials_ map (may be null).
-    // `translate` — world-space offset applied via ray shifting in PrimitiveNode.
+    // `transform` — world transform applied via full ray transform in PrimitiveNode
+    //               (supports translation + rotation from T2.3).
     SceneBuilder& addPrimitive(std::shared_ptr<IPrimitive> prim,
-                               const IMaterial* mat     = nullptr,
-                               Vector3         translate = {});
+                               const IMaterial* mat             = nullptr,
+                               Transform        transform        = Transform::identity());
 
     // Register a material under a scene-unique name.
     // The name is used in the .cfg file to associate a material to

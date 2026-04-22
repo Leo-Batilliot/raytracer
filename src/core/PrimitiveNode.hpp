@@ -3,13 +3,17 @@
 // PrimitiveNode: INode adapter that wraps a single IPrimitive (T1.1).
 // Bridges the scene-graph layer (INode) and the geometry layer (IPrimitive).
 //
-// T1.7 additions:
-//   material_  — optional IMaterial* assigned by the parser (non-owning borrow
-//                from the Scene's materials_ map). Set on every HitRecord so
-//                the renderer can call material->shade().
-//   translate_ — world-space offset applied via ray shifting: ray.origin is
-//                moved to object space before intersect(), then rec.point is
-//                moved back to world space. Normal is unchanged (no rotation).
+// T1.7: material assignment + translation via Transform.
+// T2.3: full Transform (rotation + translation) replaces bare translate_.
+//
+//   transform_        — forward transform: object-space → world-space.
+//   inverseTransform_ — world-space → object-space (cached for hot path).
+//
+// Ray transform: localRay = inverse.applyTo(worldRay) before intersect.
+// Hit transform: rec.point  = forward.applyToPoint(objectPoint).
+//               rec.normal = forward.applyToNormal(objectNormal).normalize()
+//               Normal rule: n' = (M^-1)^T * n — forward.applyToNormal() does
+//               exactly this using its cached inverse.
 
 #ifndef RAYTRACER_CORE_PRIMITIVENODE_HPP
 #define RAYTRACER_CORE_PRIMITIVENODE_HPP
@@ -18,43 +22,67 @@
 
 #include "interfaces/INode.hpp"
 #include "interfaces/IPrimitive.hpp"
-#include "math/Vector3.hpp"
+#include "math/Transform.hpp"
 
 namespace rt {
 
 class PrimitiveNode final : public INode {
 public:
     PrimitiveNode(std::shared_ptr<IPrimitive> prim,
-                  const IMaterial* mat,
-                  Vector3 translate)
-        : prim_(std::move(prim)), material_(mat), translate_(translate)
+                  const IMaterial*            mat,
+                  Transform                   transform)
+        : prim_(std::move(prim))
+        , material_(mat)
+        , transform_(transform)
+        , inverseTransform_(transform.inverse())   // cached — never recomputed
     {
     }
 
     bool intersect(const Ray& ray, HitRecord& rec) const override
     {
-        // Shift ray to object space.
+        // Transform ray to object space.
         Ray localRay    = ray;
-        localRay.origin = ray.origin - translate_;
+        localRay.origin    = inverseTransform_.applyToPoint(ray.origin);
+        localRay.direction = inverseTransform_.applyToDirection(ray.direction);
 
         if (!prim_->intersect(localRay, rec)) return false;
 
-        // Shift hit point back to world space.
-        rec.point = rec.point + translate_;
+        // Transform hit back to world space.
+        rec.point = transform_.applyToPoint(rec.point);
 
-        // Assign material (nullptr means "keep whatever the primitive set",
-        // which is also nullptr — the renderer falls back to white albedo).
+        // Normal transform: (M^-1)^T · n.
+        // forward.applyToNormal() computes exactly this using the cached inverse.
+        const Vector3 wn  = transform_.applyToNormal(rec.normal);
+        const double  len = wn.length();
+        if (len > 1e-10) rec.normal = wn / len;
+
+        // Assign material.
         if (material_) rec.material = material_;
 
         return true;
     }
 
-    AABB bounds() const override { return prim_->bounds(); }
+    // World-space AABB: transform all 8 corners of the object-space AABB.
+    AABB bounds() const override
+    {
+        const AABB local = prim_->bounds();
+        AABB world{};
+        for (int i = 0; i < 8; ++i) {
+            const Vector3 corner{
+                (i & 1) ? local.max.x : local.min.x,
+                (i & 2) ? local.max.y : local.min.y,
+                (i & 4) ? local.max.z : local.min.z,
+            };
+            world = world.expanded(transform_.applyToPoint(corner));
+        }
+        return world;
+    }
 
 private:
     std::shared_ptr<IPrimitive> prim_;
-    const IMaterial*            material_  = nullptr;
-    Vector3                     translate_{};
+    const IMaterial*            material_ = nullptr;
+    Transform                   transform_;
+    Transform                   inverseTransform_;
 };
 
 }  // namespace rt

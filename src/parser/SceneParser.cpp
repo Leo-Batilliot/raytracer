@@ -6,11 +6,14 @@
 #include <memory>
 #include <string>
 
+#include <numbers>
+
 #include "core/Exceptions.hpp"
 #include "interfaces/ILight.hpp"
 #include "interfaces/IMaterial.hpp"
 #include "interfaces/IPrimitive.hpp"
 #include "interfaces/plugin_abi.hpp"
+#include "math/Transform.hpp"
 #include "plugins/PluginLoader.hpp"
 
 namespace rt {
@@ -136,13 +139,31 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
                 }
             }
 
-            // Optional translation.
-            Vector3 translate{};
-            if (entry.exists("translate")) {
-                translate = readVec3(entry["translate"]);
+            // Optional rotation (degrees per axis, applied X → Y → Z).
+            // T2.3: rotate = { x = 0.0; y = 45.0; z = 0.0; }
+            Transform rotation = Transform::identity();
+            if (entry.exists("rotate")) {
+                constexpr double kDeg2Rad = std::numbers::pi / 180.0;
+                const libconfig::Setting& rot = entry["rotate"];
+                if (rot.exists("x"))
+                    rotation = Transform::rotationX(readScalar(rot["x"]) * kDeg2Rad);
+                if (rot.exists("y"))
+                    rotation = Transform::rotationY(readScalar(rot["y"]) * kDeg2Rad)
+                               * rotation;
+                if (rot.exists("z"))
+                    rotation = Transform::rotationZ(readScalar(rot["z"]) * kDeg2Rad)
+                               * rotation;
             }
 
-            builder.addPrimitive(std::move(prim), mat, translate);
+            // Optional translation (applied after rotation).
+            Transform translation = Transform::identity();
+            if (entry.exists("translate")) {
+                const Vector3 t = readVec3(entry["translate"]);
+                translation = Transform::translation(t.x, t.y, t.z);
+            }
+
+            // Compose: Translation * Rotation (rotate first, then translate).
+            builder.addPrimitive(std::move(prim), mat, translation * rotation);
         }
     };
 
