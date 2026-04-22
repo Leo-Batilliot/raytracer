@@ -160,10 +160,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/plugins/PluginLoader.hpp/.cpp`.
   - Critère : build propre 0 warning ; RAII (destructor dlclose inverse-order) ; 7 guards dans loadOne (dlopen, dlsym, entry non-null, name non-vide, create/destroy non-null, ABI mismatch, duplicate) → warning stderr + rejet propre ; `ldd ./raytracer` ne liste aucun plugin ; `libdl` lié.
 
-- [ ] **T0.10 — `SceneParser` minimal (libconfig++)**
+- [x] **T0.10 — `SceneParser` minimal (libconfig++)**
   - Objectif : ouverture fichier, lecture de la section `camera`.
-  - Livrable : `src/parser/SceneParser.hpp/.cpp`.
-  - Critère : `./raytracer scenes/empty_camera.cfg` ne crashe pas, retourne 0.
+  - Livrable : `src/parser/SceneParser.hpp/.cpp`, `scenes/empty_camera.cfg`.
+  - Critère : `./raytracer scenes/empty_camera.cfg` → exit 0 (✓ vérifié). Erreurs de parse → `rt::InvalidConfigError` → exit 84 + stderr. `libconfig++-dev` 1.5 installé.
 
 - [ ] **T0.11 — `SceneBuilder` (Builder pattern)**
   - Objectif : construction incrémentale de `Scene`, résolution des références de matériaux.

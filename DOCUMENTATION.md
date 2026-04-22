@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.11 — 2026-04-22 — SceneParser minimal : libconfig++, section camera (T0.10)](#v0011--2026-04-22--sceneparser-minimal--libconfig-section-camera-t010)
     - [v0.0.10 — 2026-04-22 — PluginLoader : encapsulation dlopen/dlsym/dlclose (T0.9)](#v0010--2026-04-22--pluginloader--encapsulation-dlopendlsymdlclose-t09)
     - [v0.0.9 — 2026-04-22 — ABI plugins : PluginDescriptor, RAYTRACER_ABI_VERSION (T0.8)](#v009--2026-04-22--abi-plugins--plugindescriptor-raytracer_abi_version-t08)
     - [v0.0.8 — 2026-04-22 — Interfaces publiques : IPrimitive, INode, ILight, IMaterial (T0.7)](#v008--2026-04-22--interfaces-publiques--iprimitive-inode-ilight-imaterial-t07)
@@ -99,6 +100,76 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.11 — 2026-04-22 — SceneParser minimal : libconfig++, section camera (T0.10)
+
+**Type** : feature
+**Ticket** : T0.10
+**Phase** : 0 (Fondations)
+
+**Résumé**
+`rt::SceneParser` — classe qui ouvre un fichier `.cfg` avec libconfig++, parse la section obligatoire `camera` et en retourne un `CameraConfig`. `runScene()` dans `main.cpp` instancie désormais un `PluginLoader` puis un `SceneParser`  — la chaîne end-to-end parse est opérationnelle. Première scène de démo `scenes/empty_camera.cfg` créée.
+
+**Contexte / motivation**
+T0.9 a posé le loader de plugins, T0.10 pose la lecture du fichier de scène. La brique manquante pour que `./raytracer scenes/empty_camera.cfg` retourne 0 sans crash est le parser libconfig++. La section `camera` est le minimum vital : sans elle, ni la `Camera` (T0.13) ni le `Renderer` (T0.14) ne peuvent être instanciés. Les sections primitives/lights/materials arriveront en T0.11 (SceneBuilder) et T1.7 (parser complet).
+
+**Détails techniques**
+
+- **`src/parser/SceneParser.hpp`** — interface publique.
+  - `CameraConfig { position, lookAt, up (Vector3) ; fov (double, degrés) ; width, height (int) }`.
+  - `SceneParser(fs::path)` : ouvre + parse. Throws `rt::IOError` (fichier illisible) ou `rt::InvalidConfigError` (erreur de syntaxe avec fichier + numéro de ligne).
+  - `parseCamera() → CameraConfig` : lit le groupe `camera` de façon typée. Throws `rt::InvalidConfigError` sur champ absent ou mauvais type.
+  - Pas de `<dlfcn.h>` ni de dépendance interne hors `<libconfig.h++>` et `math/Vector3.hpp`.
+- **`src/parser/SceneParser.cpp`** — implémentation.
+  - Constructeur : `config_.readFile(path.c_str())` ; les exceptions libconfig (`FileIOException`, `ParseException`) sont attrapées et converties en `rt::IOError` / `rt::InvalidConfigError`.
+  - `readVec3(Setting)` : helper privé statique qui lit `{x, y, z}` ; gère les cas `TypeInt` (ex: `0` sans point décimal dans le `.cfg`) via double cast explicite.
+  - `parseCamera()` : `config_.lookup("camera")` → parse chaque champ avec `static_cast` explicite ; attrape `SettingNotFoundException` et `SettingTypeException`.
+- **`scenes/empty_camera.cfg`** — scène minimale.
+  ```
+  camera: { position, lookAt, up en {x,y,z} ; fov=60 ; width=800 ; height=600 }
+  ```
+  Sert de test de non-régression permanent : `./raytracer scenes/empty_camera.cfg` doit toujours retourner 0.
+- **`src/main.cpp` — `runScene()` mis à jour** :
+  ```cpp
+  rt::PluginLoader loader("./plugins");   // T0.9
+  rt::SceneParser  parser(scenePath);     // T0.10
+  [[maybe_unused]] auto cam = parser.parseCamera();
+  // T0.11+: SceneBuilder → Scene → Renderer
+  ```
+  Silencieux en cas de succès (stdout vide) — conforme aux exigences Epitech.
+- **`src/CMakeLists.txt`** : ajout de `parser/SceneParser.cpp` + `target_link_libraries(... config++)`.
+- **Dépendance système** : `libconfig++-dev` version 1.5 (Ubuntu/Debian). À documenter dans `README.md` (T5.2).
+
+**Alternatives rejetées**
+- **Écrire un parser maison** : libconfig++ est la dépendance attendue par le sujet. Un parser maison serait des centaines de lignes non testées.
+- **`lookupValue` (API non-jetante)** pour lire les champs : plus verbeux (`if (!cam.lookupValue("fov", cfg.fov)) throw ...`). La variante jetante est plus concise pour des champs obligatoires.
+- **`double d = s["fov"]` sans cast explicite** : libconfig++ distingue `TypeFloat` et `TypeInt`. Un `fov = 60` (sans point) dans le `.cfg` serait de type `TypeInt` — la conversion implicite vers `double` peut générer une `SettingTypeException` sur certaines versions. Le cast explicite `static_cast<double>(static_cast<int>(s))` est robuste pour les deux.
+- **`CameraConfig` avec `std::optional` sur les champs** : tous les champs caméra sont obligatoires pour le rendu ; pas de valeur par défaut raisonnable pour `fov` ou la résolution. Lever une erreur explicite est plus clair.
+- **Séparer `SceneParser` en plusieurs classes** (une par section) : prématuré pour T0.10 ; le parser sera étendu en T0.11 et T1.7 quand les sections primitives/lights/materials arriveront.
+
+**Impact**
+- **T0.11** (SceneBuilder) : `SceneParser` sera étendu pour lire les sections `primitives`, `lights`, `materials`. Le `SceneBuilder` prend un `SceneParser&` ou les configs brutes.
+- **T0.13** (Camera) : `CameraConfig` alimentera directement le constructeur de `Camera`.
+- **T1.7** (parser complet) : `parseCamera()` rester intacte ; seules les méthodes `parsePrimitives()` etc. seront ajoutées.
+- **`ldd ./raytracer`** : `libconfig++.so` apparaît désormais dans les dépendances du binaire. Ce n'est pas un plugin raytracer — conforme.
+- **Dette technique** : `scenes/empty_camera.cfg` doit être mis à jour si le format camera évolue. Le test de régression `./raytracer scenes/empty_camera.cfg → exit 0` est à garder dans la checklist de commit.
+
+**Non couvert volontairement**
+- Sections `primitives`, `lights`, `materials`, `import` → T0.11 / T1.7.
+- Validation de `fov` (doit être > 0 et < 180), `width`/`height` (> 0) → T0.13 (Camera sait ce qui est valide pour elle).
+- Format `.json` ou `.yaml` alternatif → hors scope sujet.
+
+**Validation**
+```bash
+make re
+./raytracer scenes/empty_camera.cfg; echo $?     # 0 ← critère T0.10 ✓
+./raytracer --help; echo $?                       # 0
+./raytracer; echo $?                              # 84
+./raytracer nope.cfg; echo $?                     # 84 (IOError)
+ldd ./raytracer | grep raytracer_                 # vide
+```
+
+---
 
 ### v0.0.10 — 2026-04-22 — PluginLoader : encapsulation dlopen/dlsym/dlclose (T0.9)
 
