@@ -196,7 +196,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 
 ### Phase 1 — MUST (validation minimale du sujet)
 
-- [ ] **T1.1** — Primitive **Sphere** (vraie implémentation, plugin `.so`) — intersection rayon/sphère en espace objet.
+- [x] **T1.1** — Primitive **Sphere** (vraie implémentation, plugin `.so`) — intersection rayon/sphère en espace objet. Critère : `scenes/test_sphere.cfg` → sphère centrale (188,187,255) = normal (0,0,1) vers caméra, coin ciel (210,230,255).
 - [ ] **T1.2** — Primitive **Plane** (plugin `.so`) — plan Z=0 canonique, orienté via `Transform`.
 - [ ] **T1.3** — Lumière **Ambient** (plugin `.so`).
 - [ ] **T1.4** — Lumière **Directional** (plugin `.so`).

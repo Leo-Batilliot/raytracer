@@ -3,6 +3,6 @@
 
 add_library(raytracer_sphere SHARED SpherePlugin.cpp)
 
-target_link_libraries(raytracer_sphere PRIVATE rt_interfaces)
+target_link_libraries(raytracer_sphere PRIVATE rt_interfaces config++)
 
 set_target_properties(raytracer_sphere PROPERTIES PREFIX "")

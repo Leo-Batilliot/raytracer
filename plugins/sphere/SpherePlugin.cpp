@@ -1,39 +1,108 @@
 // Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
 //
-// Dummy sphere plugin (T0.15) — proves the end-to-end plugin chain.
-// intersect() always returns false; replaced by the real algorithm in T1.1.
+// Sphere primitive plugin (T1.1) — real ray/sphere intersection in
+// object space. Center and radius are read from the scene config so
+// the sphere is directly positioned in world space (no Transform yet;
+// that arrives in T2.3).
+
+#include <cmath>
+#include <numbers>
+
+#include <libconfig.h++>
 
 #include "interfaces/IPrimitive.hpp"
 #include "interfaces/plugin_abi.hpp"
 
 namespace {
 
-class DummySphere final : public rt::IPrimitive {
+// ----------------------------------------------------------------
+// Helper: read a scalar setting that may be TypeInt or TypeFloat.
+// ----------------------------------------------------------------
+double readScalar(const libconfig::Setting& s)
+{
+    if (s.getType() == libconfig::Setting::TypeInt)
+        return static_cast<double>(static_cast<int>(s));
+    return static_cast<double>(s);
+}
+
+// ----------------------------------------------------------------
+// Sphere
+// ----------------------------------------------------------------
+
+class Sphere final : public rt::IPrimitive {
 public:
-    bool intersect(const rt::Ray& /*ray*/,
-                   rt::HitRecord& /*rec*/) const override
+    Sphere(rt::Vector3 center, double radius)
+        : center_(center), radius_(radius)
     {
-        return false;
+    }
+
+    bool intersect(const rt::Ray& ray, rt::HitRecord& rec) const override
+    {
+        const rt::Vector3 oc     = ray.origin - center_;
+        const double      a      = ray.direction.dot(ray.direction);
+        const double      half_b = oc.dot(ray.direction);
+        const double      c      = oc.dot(oc) - radius_ * radius_;
+        const double      disc   = half_b * half_b - a * c;
+
+        if (disc < 0.0) return false;
+
+        const double sqrtd = std::sqrt(disc);
+
+        // Try the near root first, then the far root.
+        double t = (-half_b - sqrtd) / a;
+        if (t < ray.tMin || t > ray.tMax) {
+            t = (-half_b + sqrtd) / a;
+            if (t < ray.tMin || t > ray.tMax)
+                return false;
+        }
+
+        rec.t     = t;
+        rec.point = ray.at(t);
+
+        const rt::Vector3 outward = (rec.point - center_) / radius_;
+        rec.frontFace = ray.direction.dot(outward) < 0.0;
+        rec.normal    = rec.frontFace ? outward : -outward;
+        rec.uv        = uvAt(outward);  // outward is already on the unit sphere
+        rec.material  = nullptr;
+        return true;
     }
 
     rt::AABB bounds() const override
     {
-        return rt::AABB{
-            rt::Vector3{-1.0, -1.0, -1.0},
-            rt::Vector3{ 1.0,  1.0,  1.0},
+        const rt::Vector3 r{radius_, radius_, radius_};
+        return rt::AABB{center_ - r, center_ + r};
+    }
+
+    rt::Vector2 uvAt(const rt::Vector3& p) const override
+    {
+        // Spherical UV mapping on the unit sphere (p is normalized).
+        const double theta = std::acos(-p.y);
+        const double phi   = std::atan2(-p.z, p.x) + std::numbers::pi;
+        return rt::Vector2{
+            phi   / (2.0 * std::numbers::pi),
+            theta / std::numbers::pi,
         };
     }
 
-    rt::Vector2 uvAt(const rt::Vector3& /*localPoint*/) const override
-    {
-        return {};
-    }
+private:
+    rt::Vector3 center_;
+    double      radius_;
 };
 
-void* create(const libconfig::Setting& /*cfg*/)
+// ----------------------------------------------------------------
+// Plugin factory
+// ----------------------------------------------------------------
+
+void* create(const libconfig::Setting& cfg)
 {
     try {
-        return new DummySphere;
+        const rt::Vector3 center{
+            readScalar(cfg["center"]["x"]),
+            readScalar(cfg["center"]["y"]),
+            readScalar(cfg["center"]["z"]),
+        };
+        const double radius = readScalar(cfg["radius"]);
+        return new Sphere(center, radius);
     } catch (...) {
         return nullptr;
     }
@@ -41,7 +110,7 @@ void* create(const libconfig::Setting& /*cfg*/)
 
 void destroy(void* obj)
 {
-    delete static_cast<DummySphere*>(obj);
+    delete static_cast<Sphere*>(obj);
 }
 
 }  // namespace

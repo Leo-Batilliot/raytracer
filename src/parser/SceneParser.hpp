@@ -27,9 +27,12 @@
 #include <libconfig.h++>
 
 #include "core/CameraConfig.hpp"  // CameraConfig moved here in T0.11
+#include "core/SceneBuilder.hpp"
 #include "math/Vector3.hpp"
 
 namespace rt {
+
+class PluginLoader;  // defined in plugins/PluginLoader.hpp
 
 // ----------------------------------------------------------------
 // SceneParser
@@ -46,9 +49,18 @@ public:
     //   rt::InvalidConfigError — missing / wrong-typed field
     CameraConfig parseCamera() const;
 
+    // Reads the optional `primitives` section and registers each
+    // primitive with `builder` via the plugin registry `loader`.
+    // Missing section or unknown plugin kind is silently skipped.
+    void parsePrimitives(SceneBuilder& builder,
+                         const PluginLoader& loader) const;
+
 private:
     // Read a 3-component sub-group {x, y, z} from a Setting.
     static Vector3 readVec3(const libconfig::Setting& s);
+
+    // Read a scalar Setting that may be TypeInt or TypeFloat.
+    static double readScalar(const libconfig::Setting& s);
 
     libconfig::Config config_;
 };

@@ -2,9 +2,14 @@
 
 #include "parser/SceneParser.hpp"
 
+#include <iostream>
+#include <memory>
 #include <string>
 
 #include "core/Exceptions.hpp"
+#include "interfaces/IPrimitive.hpp"
+#include "interfaces/plugin_abi.hpp"
+#include "plugins/PluginLoader.hpp"
 
 namespace rt {
 
@@ -29,6 +34,13 @@ SceneParser::SceneParser(const std::filesystem::path& cfgPath)
 // ----------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------
+
+double SceneParser::readScalar(const libconfig::Setting& s)
+{
+    if (s.getType() == libconfig::Setting::TypeInt)
+        return static_cast<double>(static_cast<int>(s));
+    return static_cast<double>(s);
+}
 
 Vector3 SceneParser::readVec3(const libconfig::Setting& s)
 {
@@ -74,6 +86,44 @@ CameraConfig SceneParser::parseCamera() const
     } catch (const libconfig::SettingTypeException& e) {
         throw InvalidConfigError(
             std::string("wrong type for camera field: ") + e.getPath());
+    }
+}
+
+// ----------------------------------------------------------------
+// parsePrimitives
+// ----------------------------------------------------------------
+
+void SceneParser::parsePrimitives(SceneBuilder& builder,
+                                  const PluginLoader& loader) const
+{
+    if (!config_.exists("primitives")) return;
+
+    const libconfig::Setting& prims = config_.lookup("primitives");
+
+    // T1.1: spheres list
+    if (prims.exists("spheres")) {
+        const libconfig::Setting& spheres = prims["spheres"];
+        const int count = spheres.getLength();
+
+        const PluginDescriptor* desc =
+            loader.find(PluginKind::Primitive, "sphere");
+        if (!desc) {
+            std::cerr << "raytracer: warning: sphere plugin not loaded"
+                         " — skipping spheres section\n";
+        } else {
+            for (int i = 0; i < count; ++i) {
+                void* raw = desc->create(spheres[i]);
+                if (!raw) {
+                    std::cerr << "raytracer: warning: sphere[" << i
+                              << "]: create() failed — skipping\n";
+                    continue;
+                }
+                auto* prim = static_cast<IPrimitive*>(raw);
+                builder.addPrimitive(
+                    std::shared_ptr<IPrimitive>(prim,
+                        [desc](IPrimitive* p) { desc->destroy(p); }));
+            }
+        }
     }
 }
 

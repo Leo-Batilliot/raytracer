@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.17 — 2026-04-22 — Sphere réelle + PrimitiveNode + GroupNode (T1.1)](#v0017--2026-04-22--sphere-réelle--primitivenode--groupnode-t11)
     - [v0.0.16 — 2026-04-22 — Plugin factice sphere, fin Phase 0 (T0.15)](#v0016--2026-04-22--plugin-factice-sphere-fin-phase-0-t015)
     - [v0.0.15 — 2026-04-22 — Renderer tuile-based + Image (T0.14)](#v0015--2026-04-22--renderer-tuile-based--image-t014)
     - [v0.0.14 — 2026-04-22 — Camera pinhole + rayons primaires (T0.13)](#v0014--2026-04-22--camera-pinhole--rayons-primaires-t013)
@@ -105,6 +106,29 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.17 — 2026-04-22 — Sphere réelle + PrimitiveNode + GroupNode (T1.1)
+
+**Type** : feature
+**Ticket** : T1.1
+**Phase** : 1 (MUST)
+
+**Contexte** : Le plugin sphere était un stub. Il faut l'intersection réelle rayon/sphère pour pouvoir rendre de la géométrie.
+
+**Ce qui a changé** :
+- `plugins/sphere/SpherePlugin.cpp` : `Sphere(center, radius)`, intersection demi-discriminant (`half_b²−a·c`), normal outward/inward via `frontFace`, UV sphérique (θ=acos(−y), φ=atan2(−z,x)+π). Config lue via libconfig (`center.x/y/z`, `radius`).
+- `plugins/sphere/CMakeLists.txt` : `config++` ajouté.
+- `src/core/PrimitiveNode.hpp` : adapter INode→IPrimitive (header-only).
+- `src/core/GroupNode.hpp` : groupe composite INode, tMax shrinking pour le closest-hit (header-only).
+- `src/core/SceneBuilder.hpp/.cpp` : `addPrimitive(shared_ptr<IPrimitive>)` → crée PrimitiveNode, ajoute au GroupNode interne. `build()` utilise `root_` sinon `group_`.
+- `src/parser/SceneParser.hpp/.cpp` : `parsePrimitives(builder, loader)` lit `primitives.spheres[]`, instancie via plugin factory + deleter custom.
+- `src/main.cpp` : appel `parser.parsePrimitives(builder, loader)`.
+- `src/core/Renderer.cpp` : `shade()` visualise la normale en RGB ([-1,1]→[0,1]) jusqu'à T1.5.
+- `scenes/test_sphere.cfg` : scène de validation (sphère unité à l'origine).
+
+**Critère validé** : pixel centre = (188,187,255) ≈ normal (0,0,1) → caméra ; coin = (210,230,255) ciel. Exit 0, 0 warnings.
+
+---
 
 ### v0.0.16 — 2026-04-22 — Plugin factice sphere, fin Phase 0 (T0.15)
 

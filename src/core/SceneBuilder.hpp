@@ -26,10 +26,12 @@
 #include <vector>
 
 #include "core/CameraConfig.hpp"
+#include "core/GroupNode.hpp"
 #include "core/Scene.hpp"
 #include "interfaces/ILight.hpp"
-#include "interfaces/INode.hpp"
 #include "interfaces/IMaterial.hpp"
+#include "interfaces/INode.hpp"
+#include "interfaces/IPrimitive.hpp"
 
 namespace rt {
 
@@ -42,6 +44,10 @@ public:
     SceneBuilder& setCamera(const CameraConfig& cfg);
     SceneBuilder& setRoot(std::shared_ptr<INode> root);
     SceneBuilder& addLight(std::shared_ptr<ILight> light);
+
+    // Wrap prim in a PrimitiveNode and add it to the internal GroupNode.
+    // The GroupNode becomes the scene root if no explicit root is set.
+    SceneBuilder& addPrimitive(std::shared_ptr<IPrimitive> prim);
 
     // Register a material under a scene-unique name.
     // The name is used in the .cfg file to associate a material to
@@ -57,6 +63,7 @@ public:
 private:
     std::optional<CameraConfig>                       camera_;
     std::shared_ptr<INode>                            root_;
+    std::shared_ptr<GroupNode>                        group_;  // for addPrimitive()
     std::vector<std::shared_ptr<ILight>>              lights_;
     std::map<std::string, std::shared_ptr<IMaterial>> materials_;
 };

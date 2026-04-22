@@ -17,8 +17,13 @@ Color Renderer::shade(const Ray& ray) const
 {
     HitRecord rec;
     if (scene_.intersect(ray, rec)) {
-        // T0.15+: delegate to rec.material->shade(ctx)
-        return Color{0.5f, 0.5f, 0.5f};
+        // Visualize surface normal as RGB until T1.5 material system.
+        // Maps normal components [-1,1] → [0,1].
+        return Color{
+            static_cast<float>(rec.normal.x * 0.5 + 0.5),
+            static_cast<float>(rec.normal.y * 0.5 + 0.5),
+            static_cast<float>(rec.normal.z * 0.5 + 0.5),
+        };
     }
     // Sky gradient: white at horizon (dy≈0), blue at zenith (dy≈1).
     const auto t = static_cast<float>(0.5 * (ray.direction.y + 1.0));
