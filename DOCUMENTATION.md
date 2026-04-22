@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.20 — 2026-04-22 — Plugin DirectionalLight (T1.4)](#v0020--2026-04-22--plugin-directionallight-t14)
     - [v0.0.19 — 2026-04-22 — Plugin AmbientLight + parseLights (T1.3)](#v0019--2026-04-22--plugin-ambientlight--parselights-t13)
     - [v0.0.18 — 2026-04-22 — Plugin Plane, parsePrimitives générique (T1.2)](#v0018--2026-04-22--plugin-plane-parseprimitives-générique-t12)
     - [v0.0.17 — 2026-04-22 — Sphere réelle + PrimitiveNode + GroupNode (T1.1)](#v0017--2026-04-22--sphere-réelle--primitivenode--groupnode-t11)
@@ -108,6 +109,21 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.20 — 2026-04-22 — Plugin DirectionalLight (T1.4)
+
+**Type** : feature
+**Ticket** : T1.4
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- `plugins/directional/DirectionalPlugin.cpp` : `DirectionalLight(toLight, radiance)`. Config `direction` = direction vers la scène → negated+normalized pour `toLight_`. `sample()` retourne `LightSample{toLight_, radiance_, +inf}`. Pas de `isAmbient` override (false par défaut).
+- `plugins/directional/CMakeLists.txt` + `plugins/CMakeLists.txt`.
+- `scenes/test_directional.cfg` : sphère + plan + ambient + directional (effet en T1.6).
+
+**Critère validé** : plugin chargé, exit 0, 0 warnings.
+
+---
 
 ### v0.0.19 — 2026-04-22 — Plugin AmbientLight + parseLights (T1.3)
 
