@@ -211,7 +211,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 
 ### Phase 2 — SHOULD
 
-- [ ] **T2.1** — Primitive **Cylinder** (plugin).
+- [x] **T2.1** — Primitive **Cylinder** (plugin). Critère : `raytracer_cylinder.so` chargé, cap teal (G=171) vs body (G=147 Lambert plus faible sur flanc) dans `test_cylinder.cfg`, exit 0, 0 warnings (✓).
 - [ ] **T2.2** — Primitive **Cone** (plugin).
 - [ ] **T2.3** — **Rotation** via `Transform::rotation()`.
 - [ ] **T2.4** — **Drop shadows** (shadow ray dans la direction de `LightSample`).

@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.25 — 2026-04-23 — Plugin Cylinder (T2.1)](#v0025--2026-04-23--plugin-cylinder-t21)
     - [v0.0.24 — 2026-04-22 — Scènes de démo Phase 1 (T1.8)](#v0024--2026-04-22--scènes-de-démo-phase-1-t18)
     - [v0.0.23 — 2026-04-22 — Parser complet : matériaux + translation (T1.7)](#v0023--2026-04-22--parser-complet--matériaux--translation-t17)
     - [v0.0.22 — 2026-04-22 — Pipeline d'éclairage minimal (T1.6)](#v0022--2026-04-22--pipeline-déclairage-minimal-t16)
@@ -113,6 +114,28 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.25 — 2026-04-23 — Plugin Cylinder (T2.1)
+
+**Type** : feature
+**Ticket** : T2.1
+**Phase** : 2 (SHOULD)
+
+**Ce qui a changé** :
+- `plugins/cylinder/CylinderPlugin.cpp` : `Cylinder(center, radius, height)` — cylindre fini axé sur Y, ±halfH du centre.
+  - Body : quadratique en xz (`a = Dx²+Dz²`, `half_b = Ox*Dx+Oz*Dz`, `c = Ox²+Oz²−R²`), clamp `[-halfH, +halfH]`, racine proche en premier.
+  - Caps : `t = (±halfH − Oy)/Dy`, test `hx²+hz² ≤ R²`.
+  - UV body : `u = atan2(hz,hx)/(2π)+0.5`, `v = (hy+halfH)/(2*halfH)`. UV caps : projection XZ.
+  - Normal body : `(hx/R, 0, hz/R)`. Normal caps : `(0, ±1, 0)`.
+  - AABB : `center ± (R, halfH, R)`.
+- `plugins/cylinder/CMakeLists.txt` : `raytracer_cylinder.so`.
+- `plugins/CMakeLists.txt` : `add_subdirectory(cylinder)`.
+- `src/parser/SceneParser.cpp` : `loadList("cylinders", "cylinder")`.
+- `scenes/test_cylinder.cfg` (320×240) + `scenes/demo_cylinder.cfg` (800×600).
+
+**Critère validé** : cap teal G=171 (normal up, Lambert fort), body G=147 (normal sideways, Lambert réduit). 0 warnings.
+
+---
 
 ### v0.0.24 — 2026-04-22 — Scènes de démo Phase 1 (T1.8)
 
