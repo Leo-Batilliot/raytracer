@@ -5,7 +5,8 @@
 > - `PROJECT.md` = hub descriptif (philosophie, exigences sujet, vue d'ensemble).
 > - `PLAN.md` (ce fichier) = **quoi faire**, **dans quel ordre**, **avec quels critères d'acceptation**.
 > - `DOCUMENTATION.md` = **historique des versions** (ce qui a été ajouté, choix techniques, patches).
->
+> - `MATHS.md` = Explications mathématiques : théorie et pratique du raytracing, ainsi que la géométrie spatiale.
+> 
 > **Règle** : chaque ticket terminé doit cocher sa case ici, et déclencher une entrée correspondante dans `DOCUMENTATION.md`.
 
 ---

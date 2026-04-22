@@ -7,7 +7,8 @@ Moteur de raytracing C++ modulaire (projet Epitech **G-OOP-400-LIL-4-1-raytracer
 > - [`PROJECT.md`](./PROJECT.md) — hub descriptif : philosophie, exigences du sujet, vue d'ensemble.
 > - [`PLAN.md`](./PLAN.md) — feuille de route technique : phases, tickets, critères d'acceptation.
 > - [`DOCUMENTATION.md`](./DOCUMENTATION.md) — journal technique : historique des versions, choix, patches.
-
+> - [`MATHS.md`](./MATHS.md) — Explications mathématiques : théorie et pratique du raytracing, ainsi que la géométrie spatiale.
+> 
 ---
 
 ## 🚀 Build

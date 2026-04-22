@@ -5,7 +5,8 @@
 > - `PROJECT.md` = hub descriptif (philosophie, exigences sujet).
 > - `PLAN.md` = feuille de route (tickets, phases, critères d'acceptation).
 > - `DOCUMENTATION.md` (ce fichier) = **ce qui a été fait, quand, pourquoi, comment**.
->
+> - `MATHS.md` = Explications mathématiques : théorie et pratique du raytracing, ainsi que la géométrie spatiale.
+> 
 > **Règle** : on ne coche pas un ticket dans `PLAN.md` sans avoir ajouté son entrée ici.
 
 ---
@@ -37,6 +38,8 @@
     - [Transformations](#transformations)
     - [Bonus](#bonus)
   - [Patches / bug fixes](#patches--bug-fixes)
+    - [2026-04-22 — Suppression de `math_sanity_check()` et de `src/math/sanity.hpp`](#2026-04-22--suppression-de-math_sanity_check-et-de-srcmathsanityhpp)
+    - [2026-04-21 — Suppression du bruit `gmake[N]: Entering/Leaving directory`](#2026-04-21--suppression-du-bruit-gmaken-enteringleaving-directory)
   - [Known issues](#known-issues)
 
 ---
