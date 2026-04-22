@@ -19,6 +19,8 @@
 #include <string_view>
 
 #include "core/Exceptions.hpp"
+#include "parser/SceneParser.hpp"
+#include "plugins/PluginLoader.hpp"
 
 namespace {
 
@@ -78,13 +80,15 @@ std::filesystem::path parseArguments(int argc, char* argv[])
 
 void runScene(const std::filesystem::path& scenePath)
 {
-    // Ticket T0.3 scope ends here: we only confirm the file is readable.
-    // The actual parser (libconfig++) lands in T0.10, and the renderer
-    // pipeline in T0.11+ (Scene, SceneBuilder, Camera, Renderer).
-    std::cout << "raytracer: scene file accepted: "
-              << scenePath.string() << '\n'
-              << "raytracer: rendering pipeline not implemented yet "
-              << "(see PLAN.md, tickets T0.10+)\n";
+    // T0.9: load plugins from ./plugins/ (none yet in Phase 0).
+    rt::PluginLoader loader("./plugins");
+
+    // T0.10: parse the scene file (camera section validated here).
+    rt::SceneParser parser(scenePath);
+    [[maybe_unused]] rt::CameraConfig cam = parser.parseCamera();
+
+    // T0.11+: SceneBuilder → Scene → Renderer.
+    // (rendering pipeline not yet implemented)
 }
 
 }  // namespace
