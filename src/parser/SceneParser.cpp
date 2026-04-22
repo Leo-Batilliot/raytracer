@@ -8,6 +8,7 @@
 
 #include "core/Exceptions.hpp"
 #include "interfaces/ILight.hpp"
+#include "interfaces/IMaterial.hpp"
 #include "interfaces/IPrimitive.hpp"
 #include "interfaces/plugin_abi.hpp"
 #include "plugins/PluginLoader.hpp"
@@ -163,6 +164,50 @@ void SceneParser::parseLights(SceneBuilder& builder,
 
     loadList("ambient",     "ambient");     // T1.3
     loadList("directional", "directional"); // T1.4
+}
+
+// ----------------------------------------------------------------
+// parseMaterials
+// ----------------------------------------------------------------
+
+void SceneParser::parseMaterials(SceneBuilder& builder,
+                                  const PluginLoader& loader) const
+{
+    if (!config_.exists("materials")) return;
+
+    const libconfig::Setting& mats = config_.lookup("materials");
+
+    for (int i = 0, n = mats.getLength(); i < n; ++i) {
+        const libconfig::Setting& entry = mats[i];
+        const std::string name = entry.getName();
+
+        if (!entry.exists("type")) {
+            std::cerr << "raytracer: warning: material '" << name
+                      << "' has no 'type' field — skipping\n";
+            continue;
+        }
+
+        const std::string type =
+            static_cast<const char*>(entry["type"]);
+        const PluginDescriptor* desc =
+            loader.find(PluginKind::Material, type);
+        if (!desc) {
+            std::cerr << "raytracer: warning: material type '" << type
+                      << "' not loaded — skipping '" << name << "'\n";
+            continue;
+        }
+
+        void* raw = desc->create(entry);
+        if (!raw) {
+            std::cerr << "raytracer: warning: material '" << name
+                      << "': create() failed — skipping\n";
+            continue;
+        }
+
+        builder.registerMaterial(name,
+            std::shared_ptr<IMaterial>(static_cast<IMaterial*>(raw),
+                [desc](IMaterial* m) { desc->destroy(m); }));
+    }
 }
 
 }  // namespace rt

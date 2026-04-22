@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.21 — 2026-04-22 — Plugin FlatColor + parseMaterials (T1.5)](#v0021--2026-04-22--plugin-flatcolor--parsematerials-t15)
     - [v0.0.20 — 2026-04-22 — Plugin DirectionalLight (T1.4)](#v0020--2026-04-22--plugin-directionallight-t14)
     - [v0.0.19 — 2026-04-22 — Plugin AmbientLight + parseLights (T1.3)](#v0019--2026-04-22--plugin-ambientlight--parselights-t13)
     - [v0.0.18 — 2026-04-22 — Plugin Plane, parsePrimitives générique (T1.2)](#v0018--2026-04-22--plugin-plane-parseprimitives-générique-t12)
@@ -109,6 +110,24 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.21 — 2026-04-22 — Plugin FlatColor + parseMaterials (T1.5)
+
+**Type** : feature
+**Ticket** : T1.5
+**Phase** : 1 (MUST)
+
+**Ce qui a changé** :
+- `plugins/flat_color/FlatColorPlugin.cpp` : `FlatColor(Color albedo)`, `shade()` retourne l'albedo directement (sans éclairage — appliqué en T1.6 par le Renderer). Config : `color {r, g, b}`.
+- `plugins/flat_color/CMakeLists.txt` : `raytracer_flat_color.so`, lié à `rt_interfaces config++`.
+- `plugins/CMakeLists.txt` : `add_subdirectory(flat_color)`.
+- `src/parser/SceneParser.hpp/.cpp` : `parseMaterials(builder, loader)` — itère le groupe `materials`, lit le champ `type` pour dispatcher vers le plugin `(Material, type)`, appelle `builder.registerMaterial(name, ...)`.
+- `src/main.cpp` : `parser.parseMaterials(builder, loader)` appelé avant `parsePrimitives`.
+- `scenes/test_flat_color.cfg` : deux matériaux (red, blue), une sphère et un plan référençant chacun un matériau, ambient + directional.
+
+**Critère validé** : `raytracer_flat_color.so` chargé, `parseMaterials` enregistre les matériaux sans erreur, `test_flat_color.cfg` → exit 0, 0 warnings.
+
+---
 
 ### v0.0.20 — 2026-04-22 — Plugin DirectionalLight (T1.4)
 

@@ -58,6 +58,11 @@ public:
     void parseLights(SceneBuilder& builder,
                      const PluginLoader& loader) const;
 
+    // Reads the optional `materials` group and registers each named material.
+    // Each entry must have a `type` field matching a loaded Material plugin.
+    void parseMaterials(SceneBuilder& builder,
+                        const PluginLoader& loader) const;
+
 private:
     // Read a 3-component sub-group {x, y, z} from a Setting.
     static Vector3 readVec3(const libconfig::Setting& s);

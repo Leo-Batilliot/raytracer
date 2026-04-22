@@ -200,7 +200,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 - [x] **T1.2** — Primitive **Plane** (plugin `.so`) — plan Z=0 canonique, orienté via `Transform`. Critère : sol (188,255,188) = normal (0,1,0), ciel (216,233,255), sphère sur sol = 3 zones distinctes.
 - [x] **T1.3** — Lumière **Ambient** (plugin `.so`). Critère : `raytracer_ambient.so` chargé, `parseLights` enregistre la lumière dans `scene.lights()`, exit 0, 0 warnings.
 - [x] **T1.4** — Lumière **Directional** (plugin `.so`). Critère : `raytracer_directional.so` chargé, exit 0, 0 warnings.
-- [ ] **T1.5** — Matériau **FlatColor** (plugin `.so`).
+- [x] **T1.5** — Matériau **FlatColor** (plugin `.so`). Critère : `raytracer_flat_color.so` chargé, `parseMaterials` enregistre les matériaux dans `scene.materials()`, `test_flat_color.cfg` → exit 0, 0 warnings (✓).
 - [ ] **T1.6** — Pipeline d'éclairage minimal dans le renderer (somme ambient + diffuse lambert).
 - [ ] **T1.7** — Parser complet (primitives, lumières, matériaux référencés par nom, translation).
 - [ ] **T1.8** — Scènes de démo : `demo_sphere.cfg`, `demo_plane.cfg`, `demo_flat_color.cfg`, `light_ambient.cfg`, `light_directional.cfg`, `demo_translation.cfg`.

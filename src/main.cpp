@@ -92,6 +92,7 @@ void runScene(const std::filesystem::path& scenePath)
     rt::SceneParser parser(scenePath);
     rt::SceneBuilder builder;
     builder.setCamera(parser.parseCamera());
+    parser.parseMaterials(builder, loader);
     parser.parsePrimitives(builder, loader);
     parser.parseLights(builder, loader);
     rt::Scene scene = builder.build();
