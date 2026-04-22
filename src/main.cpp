@@ -20,6 +20,7 @@
 
 #include "core/Exceptions.hpp"
 #include "core/SceneBuilder.hpp"
+#include "output/PPMWriter.hpp"
 #include "parser/SceneParser.hpp"
 #include "plugins/PluginLoader.hpp"
 
@@ -90,8 +91,20 @@ void runScene(const std::filesystem::path& scenePath)
     builder.setCamera(parser.parseCamera());
     [[maybe_unused]] rt::Scene scene = builder.build();
 
-    // T0.12+: PPMWriter, Camera, Renderer.
-    // (rendering pipeline not yet implemented)
+    // T0.12: write a 256×256 checkerboard to stdout as PPM P6.
+    // Replaced by the real renderer in T0.14.
+    constexpr int kW = 256;
+    constexpr int kH = 256;
+    constexpr int kTile = 32;
+    std::vector<rt::Color> pixels;
+    pixels.reserve(kW * kH);
+    for (int y = 0; y < kH; ++y) {
+        for (int x = 0; x < kW; ++x) {
+            const bool white = ((x / kTile) + (y / kTile)) % 2 == 0;
+            pixels.push_back(white ? rt::Color::white() : rt::Color::black());
+        }
+    }
+    rt::PPMWriter::write(std::cout, kW, kH, pixels);
 }
 
 }  // namespace

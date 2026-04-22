@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.13 — 2026-04-22 — PPMWriter : sortie P6 binaire, sRGB (T0.12)](#v0013--2026-04-22--ppmwriter--sortie-p6-binaire-srgb-t012)
     - [v0.0.12 — 2026-04-22 — SceneBuilder + Scene immuable (T0.11)](#v0012--2026-04-22--scenebuilder--scene-immuable-t011)
     - [v0.0.11 — 2026-04-22 — SceneParser minimal : libconfig++, section camera (T0.10)](#v0011--2026-04-22--sceneparser-minimal--libconfig-section-camera-t010)
     - [v0.0.10 — 2026-04-22 — PluginLoader : encapsulation dlopen/dlsym/dlclose (T0.9)](#v0010--2026-04-22--pluginloader--encapsulation-dlopendlsymdlclose-t09)
@@ -101,6 +102,25 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.13 — 2026-04-22 — PPMWriter : sortie P6 binaire, sRGB (T0.12)
+
+**Type** : feature
+**Ticket** : T0.12
+**Phase** : 0 (Fondations)
+
+**Contexte** : Le pipeline de rendu produit des couleurs en espace linéaire (`Color`, floats). Il faut un module pour les encoder en PPM P6 (format portable, lisible par tout viewer) avec conversion gamma sRGB.
+
+**Ce qui a changé** :
+- `src/output/PPMWriter.hpp/.cpp` : `PPMWriter::write(ostream, w, h, pixels)` et `writeFile(path, ...)`.
+- Conversion IEC 61966-2-1 : linéaire ≤ 0.0031308 → ×12.92, sinon 1.055 × x^(1/2.4) − 0.055. Clampage implicite (négatif → 0, > 1 → 255).
+- Header P6 binaire (`P6\n<w> <h>\n255\n`), données pixels 3 octets/pixel sans padding.
+- `main.cpp` : `runScene()` génère un damier 256×256 (cases de 32 px) sur stdout — remplacé par le vrai renderer en T0.14.
+- `src/CMakeLists.txt` : `output/PPMWriter.cpp` ajouté.
+
+**Critère validé** : `./raytracer scenes/empty_camera.cfg > /tmp/check.ppm` → 196 623 octets (15 header + 196 608 pixels), header P6 valide, cases (0,0) = blanc, (32,0) = noir.
+
+---
 
 ### v0.0.12 — 2026-04-22 — SceneBuilder + Scene immuable (T0.11)
 

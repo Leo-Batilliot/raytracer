@@ -170,10 +170,10 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
   - Livrable : `src/core/SceneBuilder.hpp/.cpp`, `src/core/Scene.hpp/.cpp`, `src/core/CameraConfig.hpp`.
   - Critère : `./raytracer scenes/empty_camera.cfg` → exit 0 (✓) ; `SceneBuilder::build()` sans camera → `rt::InvalidConfigError` ; `scene.camera().fov == 60.0` par construction analytique (vérifié à la lecture du code).
 
-- [ ] **T0.12 — `PPMWriter` + image de test**
+- [x] **T0.12 — `PPMWriter` + image de test**
   - Objectif : écriture PPM P6 binaire, conversion linéaire → sRGB.
   - Livrable : `src/output/PPMWriter.hpp/.cpp`.
-  - Critère : damier 256×256 écrit, visualisable.
+  - Critère : damier 256×256 écrit, visualisable (✓) ; header P6 valide, 196 608 octets pixels, cases blanc/noir alternées sur 32 px.
 
 - [ ] **T0.13 — `Camera` pinhole + rayons primaires**
   - Objectif : `generateRay(x, y)` renvoie un rayon en espace monde selon FoV, position, rotation.

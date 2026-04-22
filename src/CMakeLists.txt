@@ -13,6 +13,7 @@ add_executable(raytracer
     main.cpp
     math/Matrix4.cpp
     math/Transform.cpp
+    output/PPMWriter.cpp
     plugins/PluginLoader.cpp
     parser/SceneParser.cpp
     core/Scene.cpp
