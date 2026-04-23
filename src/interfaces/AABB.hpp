@@ -3,8 +3,7 @@
 // AABB: axis-aligned bounding box.
 //
 // Used by IPrimitive::bounds() (T0.7) and INode::bounds() (scene
-// graph). Eventually consumed by a BVH (bonus T3.3) for fast ray
-// rejection.
+// graph). intersects(Ray) provides the slab test consumed by BVH (T3.3).
 //
 // Default convention: a default-constructed AABB is EMPTY — its
 // component-wise min is +inf and max is -inf. This makes `merged()`
@@ -20,6 +19,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "interfaces/Ray.hpp"
 #include "math/Vector3.hpp"
 
 namespace rt {
@@ -72,6 +72,49 @@ struct AABB {
             {std::max(max.x, other.max.x), std::max(max.y, other.max.y),
              std::max(max.z, other.max.z)},
         };
+    }
+
+    // Slab test: true if `ray` overlaps this box within [ray.tMin, ray.tMax].
+    // Uses the Andrew Woo / Kay-Kajiya slab method — branchless per axis.
+    // An empty box always returns false.
+    constexpr bool intersects(const Ray& ray) const noexcept
+    {
+        if (isEmpty()) return false;
+
+        double tlo = ray.tMin;
+        double thi = ray.tMax;
+
+        // X slab
+        {
+            const double invD = 1.0 / ray.direction.x;
+            double t0 = (min.x - ray.origin.x) * invD;
+            double t1 = (max.x - ray.origin.x) * invD;
+            if (invD < 0.0) { const double tmp = t0; t0 = t1; t1 = tmp; }
+            tlo = t0 > tlo ? t0 : tlo;
+            thi = t1 < thi ? t1 : thi;
+            if (thi < tlo) return false;
+        }
+        // Y slab
+        {
+            const double invD = 1.0 / ray.direction.y;
+            double t0 = (min.y - ray.origin.y) * invD;
+            double t1 = (max.y - ray.origin.y) * invD;
+            if (invD < 0.0) { const double tmp = t0; t0 = t1; t1 = tmp; }
+            tlo = t0 > tlo ? t0 : tlo;
+            thi = t1 < thi ? t1 : thi;
+            if (thi < tlo) return false;
+        }
+        // Z slab
+        {
+            const double invD = 1.0 / ray.direction.z;
+            double t0 = (min.z - ray.origin.z) * invD;
+            double t1 = (max.z - ray.origin.z) * invD;
+            if (invD < 0.0) { const double tmp = t0; t0 = t1; t1 = tmp; }
+            tlo = t0 > tlo ? t0 : tlo;
+            thi = t1 < thi ? t1 : thi;
+            if (thi < tlo) return false;
+        }
+        return true;
     }
 };
 
