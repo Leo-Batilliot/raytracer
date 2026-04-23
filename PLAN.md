@@ -236,7 +236,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 Ordre recommandé (gain visuel / effort) :
 
 - [x] **T4.1** — **Phong reflection model** (2 pts) — plugin `raytracer_phong.so`, paramètres `ka/kd/ks/shininess/color/specular`, spéculaire Phong dans le renderer (R·V)^n. Scènes `test_phong` + `demo_phong` (5 matériaux, shininess 16→256 + matte) (✓).
-- [ ] **T4.2** — **Reflection** (0.5 pt).
+- [x] **T4.2** — **Reflection** (0.5 pt) — plugin `raytracer_mirror.so`, `reflectivity()` virtuel sur IMaterial, `Renderer::shade()` récursif (depth, kMaxBounces=5), `r = d − 2(d·N)N`. Validé : plancher rouge réfléchi dans sphère miroir (3444 px rouges) (✓).
 - [ ] **T4.3** — **Refraction** (1 pt) + **Transparency** (0.5 pt).
 - [ ] **T4.4** — **Transformation matrix** (2 pts) — déjà acquis structurellement, à documenter.
 - [ ] **T4.5** — **Scene graph** (2 pts) — idem, à documenter + scènes de démo avec groupes.

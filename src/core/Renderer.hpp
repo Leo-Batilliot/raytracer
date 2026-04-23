@@ -31,12 +31,13 @@ public:
     void renderAll(Image& img) const;
 
 private:
-    Color shade(const Ray& ray) const;
+    Color shade(const Ray& ray, int depth = 0) const;
 
     const Scene&  scene_;
     const Camera& camera_;
 
-    static constexpr int kTileSize = 64;
+    static constexpr int kTileSize   = 64;
+    static constexpr int kMaxBounces = 5;
 };
 
 }  // namespace rt

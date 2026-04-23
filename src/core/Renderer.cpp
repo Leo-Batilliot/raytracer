@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -21,7 +22,7 @@ Renderer::Renderer(const Scene& scene, const Camera& camera)
 {
 }
 
-Color Renderer::shade(const Ray& ray) const
+Color Renderer::shade(const Ray& ray, int depth) const
 {
     HitRecord rec;
     if (!scene_.intersect(ray, rec)) {
@@ -81,7 +82,26 @@ Color Renderer::shade(const Ray& ray) const
         }
     }
 
-    return albedo * (ambient + diffuse) + specular;
+    Color color = albedo * (ambient + diffuse) + specular;
+
+    // Reflection (T4.2): blend surface color with reflected ray color.
+    const float refl = mat ? mat->reflectivity() : 0.0f;
+    if (refl > 0.0f && depth < kMaxBounces) {
+        // r = d − 2(d·N)N  — unit since d and N are unit.
+        const double NdotD = rec.normal.dot(ray.direction);
+        const Vector3 Rdir = ray.direction - rec.normal * (2.0 * NdotD);
+
+        Ray reflected;
+        reflected.origin    = rec.point + rec.normal * kRayEpsilon;
+        reflected.direction = Rdir;
+        reflected.tMin      = kRayEpsilon;
+        reflected.tMax      = std::numeric_limits<double>::infinity();
+
+        const Color reflColor = shade(reflected, depth + 1);
+        color = color * (1.0f - refl) + reflColor * refl;
+    }
+
+    return color;
 }
 
 void Renderer::renderTile(int x0, int y0, int x1, int y1, Image& img) const

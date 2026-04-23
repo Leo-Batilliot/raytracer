@@ -40,6 +40,9 @@ public:
     virtual float kd()            const { return 1.0f; }  // diffuse scale
     virtual float shininess()     const { return 0.0f; }  // 0 = no specular
     virtual Color specularColor() const { return {};   }  // ks × highlight colour
+
+    // Reflection (T4.2). 0 = opaque, 1 = perfect mirror.
+    virtual float reflectivity()  const { return 0.0f; }
 };
 
 }  // namespace rt

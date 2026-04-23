@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.32 — 2026-04-23 — Reflections (T4.2)](#v0032--2026-04-23--reflections-t42)
     - [v0.0.31 — 2026-04-23 — Phong reflection model (T4.1)](#v0031--2026-04-23--phong-reflection-model-t41)
     - [v0.0.30 — 2026-04-23 — BVH (T3.3)](#v0030--2026-04-23--bvh-t33)
     - [v0.0.29 — 2026-04-23 — Multithreading renderer + AABB slab test (T3.1/T3.2)](#v0029--2026-04-23--multithreading-renderer--aabb-slab-test-t31t32)
@@ -120,6 +121,25 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.32 — 2026-04-23 — Reflections (T4.2)
+
+**Type** : feature
+**Ticket** : T4.2
+**Phase** : 4 (bonus, 0.5 pt)
+
+**Ce qui a changé** :
+- `src/interfaces/IMaterial.hpp` : ajout de `virtual float reflectivity() const { return 0.0f; }`. Défaut = 0, aucune régression.
+- `src/core/Renderer.hpp` : `shade()` prend maintenant un paramètre `int depth = 0`. Constante `kMaxBounces = 5` ajoutée.
+- `src/core/Renderer.cpp` : après le calcul de `color`, si `reflectivity > 0` et `depth < kMaxBounces` : calcul du rayon réfléchi `r = d − 2(d·N)N` (unitaire car d et N sont unitaires), appel récursif `shade(reflected, depth+1)`, blend : `color = color*(1−r) + reflColor*r`.
+- `plugins/mirror/MirrorPlugin.cpp` (nouveau) : `MirrorMaterial` avec `reflectivity`, `color`, `ka/kd/ks/shininess`. Type `"mirror"`.
+- `plugins/mirror/CMakeLists.txt` (nouveau) : produit `raytracer_mirror.so`.
+- `scenes/test_reflection.cfg` (320×240) : sphère miroir (r=0.95) sur sol rouge. Critère : 3444 px rouges visibles dans la zone basse de la sphère = réflexion du plancher confirmée.
+- `scenes/demo_reflection.cfg` (800×600) : 3 sphères miroirs (r=1.0, 0.75, 0.45) + 2 sphères colorées qui apparaissent dans les réflexions. Rebonds inter-sphères visibles jusqu'à kMaxBounces=5.
+
+**Critère validé** : 28/28 scènes exit 0, réflexion du plancher rouge détectée par scan pixel.
+
+---
 
 ### v0.0.31 — 2026-04-23 — Phong reflection model (T4.1)
 
