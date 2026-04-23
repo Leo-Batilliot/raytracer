@@ -30,7 +30,16 @@ class IMaterial {
 public:
     virtual ~IMaterial() = default;
 
+    // Returns the surface albedo (base colour) for this hit point.
+    // The renderer applies ambient, diffuse and specular on top using
+    // ka(), kd(), specularColor() and shininess().
     virtual Color shade(const ShadingContext& ctx) const = 0;
+
+    // Phong coefficients — all default to the flat/Lambert model.
+    virtual float ka()            const { return 1.0f; }  // ambient scale
+    virtual float kd()            const { return 1.0f; }  // diffuse scale
+    virtual float shininess()     const { return 0.0f; }  // 0 = no specular
+    virtual Color specularColor() const { return {};   }  // ks × highlight colour
 };
 
 }  // namespace rt

@@ -12,6 +12,7 @@
 #include "interfaces/IMaterial.hpp"
 #include "interfaces/Ray.hpp"
 #include "interfaces/ShadingContext.hpp"
+#include "math/Vector3.hpp"
 
 namespace rt {
 
@@ -30,19 +31,27 @@ Color Renderer::shade(const Ray& ray) const
              + Color{0.5f, 0.7f, 1.0f} * t;
     }
 
-    // Albedo from the assigned material; white if none (T1.7 assigns materials).
+    // Albedo from the assigned material; white if none.
     Color albedo = Color::white();
-    if (rec.material) {
+    const IMaterial* mat = rec.material;
+    if (mat) {
         const ShadingContext ctx{scene_, rec, ray, 0};
-        albedo = rec.material->shade(ctx);
+        albedo = mat->shade(ctx);
     }
 
-    // Lighting: ambient accumulation + Lambert diffuse (with shadow test).
+    // Phong coefficients (defaults reproduce the original Lambert model).
+    const float mat_ka = mat ? mat->ka()        : 1.0f;
+    const float mat_kd = mat ? mat->kd()        : 1.0f;
+    const float mat_sh = mat ? mat->shininess() : 0.0f;
+    const Color mat_ks = mat ? mat->specularColor() : Color{};
+
+    // Lighting: ambient + Lambert diffuse + Phong specular (T4.1).
     Color ambient{};
     Color diffuse{};
+    Color specular{};
     for (const auto& light : scene_.lights()) {
         if (light->isAmbient()) {
-            ambient = ambient + light->ambientContribution();
+            ambient = ambient + light->ambientContribution() * mat_ka;
         } else {
             const LightSample ls = light->sample(rec.point);
             const float lambert = static_cast<float>(
@@ -57,11 +66,22 @@ Color Renderer::shade(const Ray& ray) const
             shadow.tMax      = ls.distance - kRayEpsilon;
             if (scene_.occluded(shadow)) continue;
 
-            diffuse = diffuse + ls.radiance * lambert;
+            diffuse = diffuse + ls.radiance * (lambert * mat_kd);
+
+            // Phong specular: R = 2(N·L)N − L, highlight = (R·V)^shininess.
+            if (mat_sh > 0.0f) {
+                const double NdotL = rec.normal.dot(ls.direction);
+                const Vector3 Rvec = rec.normal * (2.0 * NdotL) - ls.direction;
+                const Vector3 Vdir = -ray.direction;  // unit: camera ray is unit
+                const float cosRV  = static_cast<float>(
+                    std::max(0.0, Rvec.dot(Vdir)));
+                const float spec   = std::pow(cosRV, mat_sh);
+                specular = specular + mat_ks * (ls.radiance * spec);
+            }
         }
     }
 
-    return albedo * (ambient + diffuse);
+    return albedo * (ambient + diffuse) + specular;
 }
 
 void Renderer::renderTile(int x0, int y0, int x1, int y1, Image& img) const

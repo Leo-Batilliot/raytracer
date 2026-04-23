@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.31 — 2026-04-23 — Phong reflection model (T4.1)](#v0031--2026-04-23--phong-reflection-model-t41)
     - [v0.0.30 — 2026-04-23 — BVH (T3.3)](#v0030--2026-04-23--bvh-t33)
     - [v0.0.29 — 2026-04-23 — Multithreading renderer + AABB slab test (T3.1/T3.2)](#v0029--2026-04-23--multithreading-renderer--aabb-slab-test-t31t32)
     - [v0.0.28 — 2026-04-23 — Drop shadows (T2.4)](#v0028--2026-04-23--drop-shadows-t24)
@@ -119,6 +120,27 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.31 — 2026-04-23 — Phong reflection model (T4.1)
+
+**Type** : feature
+**Ticket** : T4.1
+**Phase** : 4 (bonus, 2 pts)
+
+**Ce qui a changé** :
+- `src/interfaces/IMaterial.hpp` : 4 nouveaux virtuels avec défauts : `ka()=1.0`, `kd()=1.0`, `shininess()=0.0`, `specularColor()=black`. Les défauts reproduisent exactement le modèle Lambert précédent (FlatColor ne change rien, 0 régression).
+- `src/core/Renderer.cpp` : la boucle lumières intègre maintenant `ka` sur l'ambiant, `kd` sur le diffus, et calcule le terme spéculaire Phong si `shininess > 0` : `R = 2(N·L)N − L`, `spec = (R·V)^shininess`, accumulé séparément. Retour : `albedo * (ambient + diffuse) + specular`.
+- `plugins/phong/PhongPlugin.cpp` (nouveau) : `PhongMaterial` lit `color`, `ka`, `kd`, `ks`, `shininess`, `specular` depuis libconfig. `specularColor()` renvoie `ks × specularRGB` (pré-multiplié à la construction). Type `"phong"`.
+- `plugins/phong/CMakeLists.txt` (nouveau) : produit `raytracer_phong.so`.
+- `scenes/test_phong.cfg` (320×240) : sphère blanche brillante, lumière frontale, highlight concentré (108 px saturés = hotspot spéculaire visible).
+- `scenes/demo_phong.cfg` (800×600) : 5 sphères — rouge plastique (sh=16), bleu (sh=32), or (sh=64, highlight chaud), argent (sh=256, 4 px saturés), vert mat (flat_color, sans spéculaire) — sur plan gris.
+
+**Modèle Phong** : `I = ka·Ia·albedo + kd·(N·L)·Id·albedo + ks·(R·V)^n·Is`  
+Où R = reflection de L autour de N, V = direction vers la caméra (−ray.direction).
+
+**Critère validé** : 26/26 scènes exit 0, highlight visible (max=255, hotspot isolé), shininess 256 vs 16 visible visuellement.
+
+---
 
 ### v0.0.30 — 2026-04-23 — BVH (T3.3)
 
