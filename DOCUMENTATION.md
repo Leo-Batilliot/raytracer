@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.30 — 2026-04-23 — BVH (T3.3)](#v0030--2026-04-23--bvh-t33)
     - [v0.0.29 — 2026-04-23 — Multithreading renderer + AABB slab test (T3.1/T3.2)](#v0029--2026-04-23--multithreading-renderer--aabb-slab-test-t31t32)
     - [v0.0.28 — 2026-04-23 — Drop shadows (T2.4)](#v0028--2026-04-23--drop-shadows-t24)
     - [v0.0.27 — 2026-04-23 — Rotation via Transform (T2.3)](#v0027--2026-04-23--rotation-via-transform-t23)
@@ -118,6 +119,24 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.30 — 2026-04-23 — BVH (T3.3)
+
+**Type** : performance
+**Ticket** : T3.3
+**Phase** : 3
+
+**Ce qui a changé** :
+- `src/core/BVHNode.hpp` (header-only) : `BVHNode::build(nodes)` construit un arbre BVH par split centroid-median sur l'axe le plus long (O(N log N)), `intersect()` utilise `AABB::intersects()` pour rejeter les sous-arbres entiers avant de descendre, et réduit `tMax` après le premier enfant touché pour élaguer le second.
+- `src/interfaces/AABB.hpp` : ajout de `isFinite()` — retourne false si un des 6 composants est ±inf ou NaN. Utilisé pour séparer les primitives non-bornées.
+- `src/core/SceneBuilder.cpp` : `build()` partitionne les primitives en `finite` (AABB bornée → BVH) et `infinite` (plans, sky domes → `GroupNode` linéaire). La racine de scène est soit le BVH seul, soit un `GroupNode(BVH, infiniteGroup)`. Évite le NaN centroid qui causait UB dans `std::sort`.
+- `src/core/SceneBuilder.hpp` : inclusion de `GroupNode.hpp` ajoutée.
+
+**Bug résolu** : le plan plugin retournait `AABB{-∞,-∞,-∞, +∞,+∞,+∞}`. Le centroid `(-∞ + +∞) × 0.5 = NaN` rendait le comparateur de sort UB, produisant un arbre BVH incorrect (pixels différents). La partition finite/infinite corrige cela.
+
+**Critère validé** : `cmp /tmp/mt1.ppm /tmp/bvh_fixed.ppm` → PIXEL IDENTICAL, 24/24 scènes exit 0.
+
+---
 
 ### v0.0.29 — 2026-04-23 — Multithreading renderer + AABB slab test (T3.1/T3.2)
 

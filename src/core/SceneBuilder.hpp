@@ -26,8 +26,8 @@
 #include <string_view>
 #include <vector>
 
+#include "core/BVHNode.hpp"
 #include "core/CameraConfig.hpp"
-#include "core/GroupNode.hpp"
 #include "core/Scene.hpp"
 #include "interfaces/ILight.hpp"
 #include "interfaces/IMaterial.hpp"
@@ -75,7 +75,7 @@ public:
 private:
     std::optional<CameraConfig>                       camera_;
     std::shared_ptr<INode>                            root_;
-    std::shared_ptr<GroupNode>                        group_;  // for addPrimitive()
+    std::vector<std::shared_ptr<INode>>               prims_;  // BVH leaves
     std::vector<std::shared_ptr<ILight>>              lights_;
     std::map<std::string, std::shared_ptr<IMaterial>> materials_;
 };

@@ -52,6 +52,19 @@ struct AABB {
         return min.x > max.x || min.y > max.y || min.z > max.z;
     }
 
+    // Returns true iff all six components are finite (no inf/NaN).
+    // Planes and other unbounded primitives return false here.
+    constexpr bool isFinite() const noexcept
+    {
+        auto fin = [](double v) {
+            return v != std::numeric_limits<double>::infinity()
+                && v != -std::numeric_limits<double>::infinity()
+                && v == v;  // NaN check
+        };
+        return fin(min.x) && fin(min.y) && fin(min.z)
+            && fin(max.x) && fin(max.y) && fin(max.z);
+    }
+
     // Returns a new AABB grown to include point `p`.
     constexpr AABB expanded(const Vector3& p) const noexcept
     {

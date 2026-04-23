@@ -4,7 +4,9 @@
 
 #include <utility>
 
+#include "core/BVHNode.hpp"
 #include "core/Exceptions.hpp"
+#include "core/GroupNode.hpp"
 #include "core/PrimitiveNode.hpp"
 
 namespace rt {
@@ -25,8 +27,7 @@ SceneBuilder& SceneBuilder::addPrimitive(std::shared_ptr<IPrimitive> prim,
                                           const IMaterial* mat,
                                           Transform transform)
 {
-    if (!group_) group_ = std::make_shared<GroupNode>();
-    group_->addChild(
+    prims_.push_back(
         std::make_shared<PrimitiveNode>(std::move(prim), mat, std::move(transform)));
     return *this;
 }
@@ -59,8 +60,33 @@ Scene SceneBuilder::build()
 
     Scene scene;
     scene.camera_    = std::move(*camera_);
-    // Explicit setRoot() wins; fall back to the addPrimitive() group.
-    scene.root_      = root_ ? std::move(root_) : std::move(group_);
+
+    if (root_) {
+        scene.root_ = std::move(root_);
+    } else {
+        // Partition: unbounded primitives (planes, sky domes) cannot be
+        // sorted by centroid median — they cause NaN in BVHNode::build.
+        // Keep them in a linear GroupNode tested alongside the BVH.
+        std::vector<std::shared_ptr<INode>> finite, infinite;
+        for (auto& n : prims_) {
+            if (n->bounds().isFinite())
+                finite.push_back(std::move(n));
+            else
+                infinite.push_back(std::move(n));
+        }
+
+        auto bvh = BVHNode::build(std::move(finite));
+
+        if (infinite.empty()) {
+            scene.root_ = bvh;
+        } else {
+            auto group = std::make_shared<GroupNode>();
+            if (bvh) group->addChild(std::move(bvh));
+            for (auto& n : infinite) group->addChild(std::move(n));
+            scene.root_ = std::move(group);
+        }
+    }
+
     scene.lights_    = std::move(lights_);
     scene.materials_ = std::move(materials_);
     return scene;

@@ -225,7 +225,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 
 - [x] **T3.1** — Audit architecture : plugins isolés (ldd propre), 0 cross-include, ABI v1 cohérente, ASan/UBSan clean, `AABB::intersects(Ray)` ajouté pour T3.3 (✓).
 - [x] **T3.2** — **Multithreading** du renderer : thread pool atomic-index sur les tuiles. `demo_grand` 1280×720 : 1.03s → 0.26s (×4 sur 12 cœurs), sortie déterministe (✓).
-- [ ] **T3.3** — (Optionnel) **BVH** / space partitioning si la géométrie devient lourde.
+- [x] **T3.3** — **BVH** (Bounding Volume Hierarchy) : `BVHNode::build()` centroid-median sur l'axe le plus long, slab test AABB. Nœuds à AABB infinie (plans) isolés dans un `GroupNode` parallèle pour éviter NaN dans le tri. Rendu pixel-identique pré/post-BVH, 24/24 scènes OK (✓).
 
 **🏁 Fin de Phase 3** : dev confortable pour la suite, rendus rapides.
 
