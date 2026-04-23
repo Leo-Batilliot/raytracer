@@ -215,7 +215,7 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 - [x] **T2.2** — Primitive **Cone** (plugin). Critère : `raytracer_cone.so` chargé, corps orange Lambert (R=165,G=119) + base (R=228,G=166) visible, exit 0, 0 warnings (✓).
 - [x] **T2.3** — **Rotation** via `Transform::rotation()`. Critère : cylindre cobalt horizontal (rotZ=90°, 2194 px bleus x:112..207) + cône amber incliné (rotX=30°, 542 px ambrés x:93..112) dans `test_rotation.cfg`, exit 0, 0 warnings (✓).
 - [x] **T2.4** — **Drop shadows** (shadow ray dans la direction de `LightSample`). Critère : `Scene::occluded()` ajouté ; `test_shadows.cfg` → 1888 pixels ombragés sRGB≈97 (ambient seul) vs 72 486 pixels éclairés sRGB≈233, exit 0, 0 warnings (✓).
-- [x] **T2.5** — Scènes de démo : `demo_cylinder.cfg` (✓), `demo_cone.cfg` (✓), `demo_rotation.cfg` (✓), `demo_shadows.cfg` (✓, 9752 px ombragés).
+- [x] **T2.5** — Scènes de démo : `demo_cylinder.cfg` (✓), `demo_cone.cfg` (✓), `demo_rotation.cfg` (✓), `demo_shadows.cfg` (✓), `demo_grand.cfg` (1280×720, toutes features réunies : 6 sphères, 2 cylindres, 2 cônes, 11 matériaux, rotation, ombres, 2 lumières directionnelles ✓).
 
 **🏁 Fin de Phase 2** : toutes les features MUST + SHOULD fonctionnent, architecture toujours propre.
 
