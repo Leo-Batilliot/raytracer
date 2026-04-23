@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.29 — 2026-04-23 — Multithreading renderer + AABB slab test (T3.1/T3.2)](#v0029--2026-04-23--multithreading-renderer--aabb-slab-test-t31t32)
     - [v0.0.28 — 2026-04-23 — Drop shadows (T2.4)](#v0028--2026-04-23--drop-shadows-t24)
     - [v0.0.27 — 2026-04-23 — Rotation via Transform (T2.3)](#v0027--2026-04-23--rotation-via-transform-t23)
     - [v0.0.26 — 2026-04-23 — Plugin Cone (T2.2)](#v0026--2026-04-23--plugin-cone-t22)
@@ -117,6 +118,21 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.29 — 2026-04-23 — Multithreading renderer + AABB slab test (T3.1/T3.2)
+
+**Type** : performance
+**Tickets** : T3.1, T3.2
+**Phase** : 3
+
+**Ce qui a changé** :
+- `src/interfaces/AABB.hpp` : `bool intersects(const Ray&) const noexcept` — slab test Kay-Kajiya branchless par axe. Prérequis pour BVH (T3.3).
+- `src/core/Renderer.cpp` : `renderAll()` parallélisé via thread pool minimaliste. Toutes les tuiles sont indexées dans un `std::vector<Tile>`, un `std::atomic<int>` distribue les indices sans mutex. N threads = `std::thread::hardware_concurrency()`. Aucun état partagé mutable entre threads : `Scene` const, `Camera` const, pixels de tuiles disjoints.
+- Gain mesuré sur `demo_grand.cfg` (1280×720, 12 cœurs) : **1.03s → 0.26s (×4)**, 692% CPU, sortie binaire identique d'un run à l'autre.
+
+**Critère validé** : 24/24 scènes exit 0, output déterministe (`cmp` entre deux runs identiques), 0 warnings.
+
+---
 
 ### v0.0.28 — 2026-04-23 — Drop shadows (T2.4)
 

@@ -223,8 +223,8 @@ Chaque ticket a : **objectif** · **livrable** · **critère d'acceptation** (v�
 
 ### Phase 3 — Audit & multithreading
 
-- [ ] **T3.1** — Audit architecture : ajouter un type = N fichiers ? Plugins réellement indépendants ? `ldd ./raytracer` vierge ?
-- [ ] **T3.2** — **Multithreading** du renderer (thread pool sur les tuiles) — bonus 1 pt, gain énorme pour le dev.
+- [x] **T3.1** — Audit architecture : plugins isolés (ldd propre), 0 cross-include, ABI v1 cohérente, ASan/UBSan clean, `AABB::intersects(Ray)` ajouté pour T3.3 (✓).
+- [x] **T3.2** — **Multithreading** du renderer : thread pool atomic-index sur les tuiles. `demo_grand` 1280×720 : 1.03s → 0.26s (×4 sur 12 cœurs), sortie déterministe (✓).
 - [ ] **T3.3** — (Optionnel) **BVH** / space partitioning si la géométrie devient lourde.
 
 **🏁 Fin de Phase 3** : dev confortable pour la suite, rendus rapides.

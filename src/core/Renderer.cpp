@@ -3,6 +3,9 @@
 #include "core/Renderer.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <thread>
+#include <vector>
 
 #include "interfaces/HitRecord.hpp"
 #include "interfaces/ILight.hpp"
@@ -74,14 +77,34 @@ void Renderer::renderAll(Image& img) const
 {
     const int w = img.width();
     const int h = img.height();
-    for (int y0 = 0; y0 < h; y0 += kTileSize) {
-        for (int x0 = 0; x0 < w; x0 += kTileSize) {
-            renderTile(x0, y0,
-                       std::min(x0 + kTileSize, w),
-                       std::min(y0 + kTileSize, h),
-                       img);
-        }
+
+    struct Tile { int x0, y0, x1, y1; };
+    std::vector<Tile> tiles;
+    for (int y0 = 0; y0 < h; y0 += kTileSize)
+        for (int x0 = 0; x0 < w; x0 += kTileSize)
+            tiles.push_back({x0, y0,
+                             std::min(x0 + kTileSize, w),
+                             std::min(y0 + kTileSize, h)});
+
+    const int nTiles = static_cast<int>(tiles.size());
+    std::atomic<int> next{0};
+
+    const int nThreads = std::max(1u, std::thread::hardware_concurrency());
+    std::vector<std::thread> workers;
+    workers.reserve(nThreads);
+
+    for (int i = 0; i < nThreads; ++i) {
+        workers.emplace_back([&]() {
+            for (int idx = next.fetch_add(1, std::memory_order_relaxed);
+                 idx < nTiles;
+                 idx = next.fetch_add(1, std::memory_order_relaxed)) {
+                const Tile& t = tiles[idx];
+                renderTile(t.x0, t.y0, t.x1, t.y1, img);
+            }
+        });
     }
+
+    for (auto& w : workers) w.join();
 }
 
 }  // namespace rt
