@@ -20,4 +20,11 @@ bool Scene::intersect(const Ray& ray, HitRecord& rec) const
     return root_->intersect(ray, rec);
 }
 
+bool Scene::occluded(const Ray& shadowRay) const
+{
+    if (!root_) return false;
+    HitRecord dummy;
+    return root_->intersect(shadowRay, dummy);
+}
+
 }  // namespace rt

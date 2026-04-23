@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.28 — 2026-04-23 — Drop shadows (T2.4)](#v0028--2026-04-23--drop-shadows-t24)
     - [v0.0.27 — 2026-04-23 — Rotation via Transform (T2.3)](#v0027--2026-04-23--rotation-via-transform-t23)
     - [v0.0.26 — 2026-04-23 — Plugin Cone (T2.2)](#v0026--2026-04-23--plugin-cone-t22)
     - [v0.0.25 — 2026-04-23 — Plugin Cylinder (T2.1)](#v0025--2026-04-23--plugin-cylinder-t21)
@@ -116,6 +117,22 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.28 — 2026-04-23 — Drop shadows (T2.4)
+
+**Type** : feature
+**Ticket** : T2.4 + T2.5
+**Phase** : 2 (SHOULD)
+
+**Ce qui a changé** :
+- `src/core/Scene.hpp/.cpp` : `bool Scene::occluded(const Ray& shadowRay) const` — délègue à `root_->intersect()` avec dummy HitRecord, court-circuite dès le premier hit.
+- `src/core/Renderer.cpp` : dans la boucle de lumières, avant d'accumuler la contribution Lambert, un shadow ray est émis. Origin = `rec.point + rec.normal × kRayEpsilon` (biais normal pour éviter l'auto-intersection). `tMax = ls.distance − kRayEpsilon` (bloque avant la source pour les point lights ; ∞ pour les directionnels). Si `occluded()` retourne true : `continue` (contribution ignorée).
+- `scenes/test_shadows.cfg` (320×240) : sphère rouge sur sol gris, lumière directionnelle depuis haut-gauche. Critère : 1 888 pixels ombragés (sRGB≈97) + 72 486 pixels éclairés (sRGB≈233).
+- `scenes/demo_shadows.cfg` (800×600) : 6 sphères + 1 cylindre + 1 cône, lumière très contrastée (ambient=0.06), 9 752 pixels ombragés visibles.
+
+**Critère validé** : `test_shadows.cfg` → ombre nette (1 888 px sRGB≈97) vs sol éclairé (72 486 px sRGB≈233), exit 0, 0 warnings.
+
+---
 
 ### v0.0.27 — 2026-04-23 — Rotation via Transform (T2.3)
 

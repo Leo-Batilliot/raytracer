@@ -7,6 +7,7 @@
 #include "interfaces/HitRecord.hpp"
 #include "interfaces/ILight.hpp"
 #include "interfaces/IMaterial.hpp"
+#include "interfaces/Ray.hpp"
 #include "interfaces/ShadingContext.hpp"
 
 namespace rt {
@@ -33,7 +34,7 @@ Color Renderer::shade(const Ray& ray) const
         albedo = rec.material->shade(ctx);
     }
 
-    // Lighting: ambient accumulation + Lambert diffuse per directional light.
+    // Lighting: ambient accumulation + Lambert diffuse (with shadow test).
     Color ambient{};
     Color diffuse{};
     for (const auto& light : scene_.lights()) {
@@ -43,6 +44,16 @@ Color Renderer::shade(const Ray& ray) const
             const LightSample ls = light->sample(rec.point);
             const float lambert = static_cast<float>(
                 std::max(0.0, rec.normal.dot(ls.direction)));
+            if (lambert <= 0.0f) continue;
+
+            // Shadow ray biased along normal to avoid self-intersection.
+            Ray shadow;
+            shadow.origin    = rec.point + rec.normal * kRayEpsilon;
+            shadow.direction = ls.direction;
+            shadow.tMin      = kRayEpsilon;
+            shadow.tMax      = ls.distance - kRayEpsilon;
+            if (scene_.occluded(shadow)) continue;
+
             diffuse = diffuse + ls.radiance * lambert;
         }
     }

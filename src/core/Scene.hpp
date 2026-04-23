@@ -63,6 +63,9 @@ public:
     // Fills `rec` with the closest hit in [ray.tMin, ray.tMax].
     bool intersect(const Ray& ray, HitRecord& rec) const;
 
+    // Shadow query: true if any geometry blocks the ray within [tMin, tMax].
+    bool occluded(const Ray& shadowRay) const;
+
 private:
     friend class SceneBuilder;
     Scene() = default;
