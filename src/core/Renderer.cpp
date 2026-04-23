@@ -85,8 +85,10 @@ Color Renderer::shade(const Ray& ray, int depth) const
     Color color = albedo * (ambient + diffuse) + specular;
 
     // Reflection (T4.2): blend surface color with reflected ray color.
-    const float refl = mat ? mat->reflectivity() : 0.0f;
-    if (refl > 0.0f && depth < kMaxBounces) {
+    const float refl  = mat ? mat->reflectivity()  : 0.0f;
+    const float transp = mat ? mat->transparency() : 0.0f;
+
+    if (refl > 0.0f && transp == 0.0f && depth < kMaxBounces) {
         // r = d − 2(d·N)N  — unit since d and N are unit.
         const double NdotD = rec.normal.dot(ray.direction);
         const Vector3 Rdir = ray.direction - rec.normal * (2.0 * NdotD);
@@ -99,6 +101,56 @@ Color Renderer::shade(const Ray& ray, int depth) const
 
         const Color reflColor = shade(reflected, depth + 1);
         color = color * (1.0f - refl) + reflColor * refl;
+    }
+
+    // Refraction / transparency (T4.3): Snell's law + Schlick Fresnel.
+    if (transp > 0.0f && depth < kMaxBounces) {
+        const float matIOR = mat ? mat->ior() : 1.5f;
+        // eta = ratio n1/n2; frontFace means entering the medium.
+        const float  eta   = rec.frontFace ? (1.0f / matIOR) : matIOR;
+        const float  cosI  = static_cast<float>(-ray.direction.dot(rec.normal));
+
+        // Perpendicular component of refracted direction.
+        const Vector3 rPerp = (ray.direction + rec.normal * static_cast<double>(cosI))
+                              * static_cast<double>(eta);
+        const double rPerpLenSq = rPerp.lengthSquared();
+
+        // Build reflected ray (needed for TIR and Fresnel blend).
+        const double  NdotD = rec.normal.dot(ray.direction);
+        const Vector3 Rdir  = ray.direction - rec.normal * (2.0 * NdotD);
+        Ray reflRay;
+        reflRay.origin    = rec.point + rec.normal * kRayEpsilon;
+        reflRay.direction = Rdir;
+        reflRay.tMin      = kRayEpsilon;
+        reflRay.tMax      = std::numeric_limits<double>::infinity();
+        const Color reflColor = shade(reflRay, depth + 1);
+
+        if (rPerpLenSq >= 1.0) {
+            // Total internal reflection — full reflection, no transmission.
+            color = color * (1.0f - transp) + reflColor * transp;
+        } else {
+            // Schlick Fresnel: use angle in the less-dense medium (air side).
+            const float schlickCos = rec.frontFace ? cosI
+                                   : static_cast<float>(std::sqrt(1.0 - rPerpLenSq));
+            const float r0val = (1.0f - matIOR) / (1.0f + matIOR);
+            const float R0    = r0val * r0val;
+            const float fresnel = R0 + (1.0f - R0) * std::pow(1.0f - schlickCos, 5.0f);
+
+            // Refracted direction: rPerp + rPar.
+            const Vector3 rPar      = rec.normal * (-std::sqrt(1.0 - rPerpLenSq));
+            const Vector3 refractDir = rPerp + rPar;
+
+            Ray refractRay;
+            refractRay.origin    = rec.point - rec.normal * kRayEpsilon;
+            refractRay.direction = refractDir;
+            refractRay.tMin      = kRayEpsilon;
+            refractRay.tMax      = std::numeric_limits<double>::infinity();
+            const Color refractColor = shade(refractRay, depth + 1);
+
+            color = color * (1.0f - transp)
+                  + (reflColor * fresnel
+                  +  refractColor * albedo * (1.0f - fresnel)) * transp;
+        }
     }
 
     return color;

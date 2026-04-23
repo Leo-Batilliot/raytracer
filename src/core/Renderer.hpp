@@ -37,7 +37,7 @@ private:
     const Camera& camera_;
 
     static constexpr int kTileSize   = 64;
-    static constexpr int kMaxBounces = 5;
+    static constexpr int kMaxBounces = 8;
 };
 
 }  // namespace rt

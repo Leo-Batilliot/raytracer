@@ -43,6 +43,12 @@ public:
 
     // Reflection (T4.2). 0 = opaque, 1 = perfect mirror.
     virtual float reflectivity()  const { return 0.0f; }
+
+    // Refraction / transparency (T4.3).
+    // transparency: 0 = opaque, 1 = fully glass-like.
+    // ior: index of refraction (1.0 = air/no-bend, 1.5 = glass, 2.42 = diamond).
+    virtual float transparency()  const { return 0.0f; }
+    virtual float ior()           const { return 1.0f; }
 };
 
 }  // namespace rt

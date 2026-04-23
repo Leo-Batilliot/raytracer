@@ -18,6 +18,7 @@
   - [Format d'une entrée](#format-dune-entrée)
   - [Versioning](#versioning)
   - [Changelog](#changelog)
+    - [v0.0.33 — 2026-04-24 — Refraction / Transparency (T4.3)](#v0033--2026-04-24--refraction--transparency-t43)
     - [v0.0.32 — 2026-04-23 — Reflections (T4.2)](#v0032--2026-04-23--reflections-t42)
     - [v0.0.31 — 2026-04-23 — Phong reflection model (T4.1)](#v0031--2026-04-23--phong-reflection-model-t41)
     - [v0.0.30 — 2026-04-23 — BVH (T3.3)](#v0030--2026-04-23--bvh-t33)
@@ -121,6 +122,32 @@ Exemples :
 ---
 
 ## Changelog
+
+### v0.0.33 — 2026-04-24 — Refraction / Transparency (T4.3)
+
+**Type** : feature
+**Ticket** : T4.3
+**Phase** : 4 (bonus, 1 pt réfraction + 0.5 pt transparence)
+
+**Ce qui a changé** :
+- `src/interfaces/IMaterial.hpp` : 2 nouveaux virtuels avec défauts : `transparency()=0.0`, `ior()=1.0`. Les défauts sont neutres (opaque, IOR=air) — aucune régression sur les matériaux existants.
+- `src/core/Renderer.hpp` : `kMaxBounces` porté de 5 à 8 (le verre traverse 2 surfaces par sphère, il faut plus de budget).
+- `src/core/Renderer.cpp` : bloc transparence ajouté après le bloc réflexion. Algorithme :
+  - `eta = frontFace ? 1/ior : ior` — ratio n₁/n₂ selon le sens de traversée.
+  - `cosI = -ray.direction · N` (toujours positif via convention `frontFace`).
+  - Loi de Snell vectorisée : `rPerp = eta*(d + cosI*N)`, `rPar = -√(1−|rPerp|²)*N`, `refractDir = rPerp + rPar`.
+  - TIR si `|rPerp|² ≥ 1` → réflexion totale.
+  - Fresnel Schlick : `R0 = ((1−ior)/(1+ior))²`, `F = R0 + (1−R0)*(1−cosI_air)^5` (cosI côté air).
+  - Blend final : `color*(1−t) + (F*reflColor + (1−F)*refractColor*albedo)*t`.
+  - Biais du rayon réfracté : `−N*ε` (on traverse la surface).
+- `plugins/glass/GlassPlugin.cpp` (nouveau) : `GlassMaterial` avec `transparency`, `ior`, `color` (teinte transmise), `ka/kd/ks/shininess` facultatifs. Type `"glass"`.
+- `plugins/glass/CMakeLists.txt` (nouveau) : produit `raytracer_glass.so`.
+- `scenes/test_refraction.cfg` (320×240) : sphère verre (ior=1.5, t=0.97) sur sol rouge + mur bleu derrière. Critère : sol rouge visible à travers la sphère (pixels rougeâtres dans la zone basse de la sphère), mur bleu visible en haut.
+- `scenes/demo_refraction.cfg` (800×600) : 3 sphères verre (clear ior=1.5, green ior=1.6, diamond ior=2.42) + 2 sphères Phong opaques derrière. Distorsion croissante avec l'IOR.
+
+**Critère validé** : build propre, test_refraction confirme pixels rouges refractés (scan pixel python), demo_refraction rend 800×600 sans crash.
+
+---
 
 ### v0.0.32 — 2026-04-23 — Reflections (T4.2)
 
