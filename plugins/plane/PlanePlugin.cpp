@@ -1,14 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Plane primitive plugin (T1.2).
-// Canonical form: infinite plane defined by unit normal N and signed
-// distance d from the origin — the plane equation is dot(N, P) = d.
-// Two-sided: front/back determined by the sign of dot(N, ray.direction).
-//
-// Transform-based orientation (T2.3+) will map the canonical XY plane
-// (N=(0,0,1), d=0) to any desired position/rotation.  Until then,
-// normal and distance are read directly from the scene config.
-
 #include <cmath>
 #include <limits>
 
@@ -28,16 +17,11 @@ double readScalar(const libconfig::Setting& s)
     return static_cast<double>(s);
 }
 
-// ----------------------------------------------------------------
-// Plane
-// ----------------------------------------------------------------
-
 class Plane final : public rt::IPrimitive {
 public:
     Plane(rt::Vector3 normal, double distance)
         : normal_(normal), distance_(distance)
     {
-        // Precompute tangent/bitangent for UV mapping.
         const rt::Vector3 helper =
             (std::abs(normal_.x) > 0.9)
                 ? rt::Vector3{0.0, 1.0, 0.0}
@@ -66,7 +50,6 @@ public:
 
     rt::AABB bounds() const override
     {
-        // An infinite plane has unbounded AABB.
         constexpr double inf = std::numeric_limits<double>::infinity();
         return rt::AABB{
             rt::Vector3{-inf, -inf, -inf},
@@ -88,10 +71,6 @@ private:
     rt::Vector3 tangent_;
     rt::Vector3 bitangent_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {

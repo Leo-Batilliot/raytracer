@@ -1,21 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Matrix4: 4x4 matrix of doubles, row-major contiguous storage.
-//
-// Convention:
-//   - Row-major: element (row, col) is at flat index row*4 + col.
-//   - Default-constructed Matrix4 is the IDENTITY matrix. This is the
-//     neutral element for multiplication and what a freshly created
-//     transform should represent; it matches PBRT / GLM conventions.
-//   - Vectors are treated as column vectors; multiplication is M * v.
-//   - Points are in homogeneous coordinates with w = 1 (affine row).
-//   - Directions use w = 0 (no translation applied).
-//
-// Ticket: T0.5.
-// Hot paths (intersect / shade / tile loop) must NOT throw. The only
-// throwing method is `inverse()`, which is called at Transform
-// construction time (boundaries), never inside the render loop.
-
 #ifndef RAYTRACER_MATH_MATRIX4_HPP
 #define RAYTRACER_MATH_MATRIX4_HPP
 
@@ -27,9 +9,10 @@
 
 namespace rt {
 
+// 4×4 matrix, row-major storage. Default-constructed = identity.
+// Vectors are column vectors; w=1 for points, w=0 for directions.
 class Matrix4 {
 public:
-    // Default-constructed Matrix4 is the identity matrix.
     constexpr Matrix4() noexcept
         : m_{{
               1.0, 0.0, 0.0, 0.0,
@@ -40,7 +23,6 @@ public:
     {
     }
 
-    // Explicit 16-value constructor, row-major ordering.
     constexpr Matrix4(double m00, double m01, double m02, double m03,
                       double m10, double m11, double m12, double m13,
                       double m20, double m21, double m22, double m23,
@@ -54,7 +36,6 @@ public:
     {
     }
 
-    // Element access: M(row, col).
     constexpr double operator()(std::size_t row, std::size_t col) const noexcept
     {
         return m_[row * 4 + col];
@@ -66,9 +47,6 @@ public:
 
     constexpr bool operator==(const Matrix4&) const = default;
 
-    // -----------------------------------------------------------------
-    // Named constructors
-    // -----------------------------------------------------------------
     static constexpr Matrix4 identity() noexcept { return Matrix4{}; }
 
     static constexpr Matrix4 translation(double dx, double dy, double dz) noexcept
@@ -91,8 +69,7 @@ public:
         };
     }
 
-    // Rotations are not constexpr: std::cos / std::sin are not
-    // constexpr in C++20 (they become constexpr in C++23).
+    // std::cos/sin are not constexpr in C++20.
     static Matrix4 rotationX(double radians) noexcept
     {
         const double c = std::cos(radians);
@@ -127,12 +104,7 @@ public:
         };
     }
 
-    // -----------------------------------------------------------------
-    // Application to Vector3 (homogeneous)
-    // -----------------------------------------------------------------
-    // Point: w = 1, translation row applies. No perspective divide (w
-    // stays 1 for rigid + scale affine transforms; if a projection is
-    // added later, this helper should be revisited).
+    // Point (w=1): translation applies.
     constexpr Vector3 applyToPoint(const Vector3& p) const noexcept
     {
         return {
@@ -142,7 +114,7 @@ public:
         };
     }
 
-    // Direction: w = 0, translation row ignored.
+    // Direction (w=0): translation row ignored.
     constexpr Vector3 applyToDirection(const Vector3& d) const noexcept
     {
         return {
@@ -152,9 +124,6 @@ public:
         };
     }
 
-    // -----------------------------------------------------------------
-    // Core operations
-    // -----------------------------------------------------------------
     constexpr Matrix4 operator*(const Matrix4& rhs) const noexcept
     {
         Matrix4 r;
@@ -181,9 +150,7 @@ public:
         return r;
     }
 
-    // Gauss-Jordan inverse with partial pivoting. Throws rt::MathError
-    // if the matrix is (numerically) singular. Definition lives in
-    // Matrix4.cpp to keep the header light.
+    // Gauss-Jordan inverse with partial pivoting. Throws rt::MathError if singular.
     Matrix4 inverse() const;
 
 private:

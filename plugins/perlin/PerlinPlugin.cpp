@@ -1,17 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Perlin noise procedural material plugin (T4.7).
-// Implements Ken Perlin's "Improved Noise" (SIGGRAPH 2002) in 3D,
-// evaluated at the world-space hit position.
-//
-// Three modes (selected via `mode` in the config):
-//   "noise"       — raw noise in [0,1], smooth organic pattern.
-//   "turbulence"  — sum of |noise| over octaves, rocky/cloudy look (default).
-//   "marble"      — sine wave warped by turbulence, classic marble veining.
-//
-// In all modes, the scalar result linearly interpolates between color1
-// and color2, and Phong shading parameters apply normally.
-//
 // Config block:
 //   type    = "perlin";
 //   color1  = { r = 0.9; g = 0.85; b = 0.75; };  // "light" tone
@@ -23,8 +9,6 @@
 //   kd      = 0.75;         // diffuse  (default 0.75)
 //   ks      = 0.20;         // specular (default 0.20)
 //   shininess = 32.0;       // Phong exponent (default 32)
-//
-// Ticket: T4.7.
 
 #include <cmath>
 #include <cstring>
@@ -37,11 +21,7 @@
 
 namespace {
 
-// ----------------------------------------------------------------
-// Perlin noise — Ken Perlin "Improving Noise" (2002)
-// ----------------------------------------------------------------
-
-// Original permutation table (256 entries, used doubled to avoid masking).
+// Ken Perlin "Improving Noise" (SIGGRAPH 2002) — original permutation table.
 static const int kPerm[256] = {
     151,160,137, 91, 90, 15,131, 13,201, 95, 96, 53,194,233,  7,225,
     140, 36,103, 30, 69,142,  8, 99, 37,240, 21, 10, 23,190,  6,148,
@@ -61,7 +41,7 @@ static const int kPerm[256] = {
     222,114, 67, 29, 24, 72,243,141,128,195, 78, 66,215, 61,156,180
 };
 
-// Improved fade: 6t^5 - 15t^4 + 10t^3  (zero first and second derivative at 0 and 1)
+// Improved fade: 6t^5 - 15t^4 + 10t^3 (zero first and second derivative at 0 and 1).
 static double fade(double t) noexcept
 {
     return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
@@ -72,7 +52,7 @@ static double lerp(double a, double b, double t) noexcept
     return a + t * (b - a);
 }
 
-// Gradient: maps hash to one of 12 unit vectors on edges of a cube.
+// Gradient: hash → one of 12 unit vectors on cube edges.
 static double grad(int hash, double x, double y, double z) noexcept
 {
     const int    h = hash & 15;
@@ -81,22 +61,18 @@ static double grad(int hash, double x, double y, double z) noexcept
     return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
-// Integer floor (handles negative values correctly unlike int cast).
 static int ifloor(double x) noexcept
 {
     const int i = static_cast<int>(x);
     return (x < static_cast<double>(i)) ? i - 1 : i;
 }
 
-// 3D noise — returns value in [-1, 1].
 static double noise3(double x, double y, double z) noexcept
 {
-    // Unit-cube cell containing the point.
     const int X = ifloor(x) & 255;
     const int Y = ifloor(y) & 255;
     const int Z = ifloor(z) & 255;
 
-    // Fractional position inside the cube.
     x -= std::floor(x);
     y -= std::floor(y);
     z -= std::floor(z);
@@ -105,7 +81,6 @@ static double noise3(double x, double y, double z) noexcept
     const double v = fade(y);
     const double w = fade(z);
 
-    // Hash the 8 corners via the permutation table (& 255 replaces the doubled table).
     auto p = [](int i) noexcept { return kPerm[i & 255]; };
 
     const int A  = p(X)   + Y;
@@ -130,8 +105,7 @@ static double noise3(double x, double y, double z) noexcept
         w);
 }
 
-// Fractal Brownian Motion — turbulence, returns [0, 1].
-// Sums absolute values of noise at doubling frequencies.
+// Fractal Brownian Motion (turbulence): sum of |noise| over doubling frequencies.
 static double turbulence(double x, double y, double z, int octaves) noexcept
 {
     double total  = 0.0;
@@ -145,10 +119,6 @@ static double turbulence(double x, double y, double z, int octaves) noexcept
     }
     return total / maxAmp;
 }
-
-// ----------------------------------------------------------------
-// PerlinMaterial
-// ----------------------------------------------------------------
 
 enum class Mode { kNoise, kTurbulence, kMarble };
 
@@ -174,14 +144,13 @@ public:
         double t = 0.0;
         switch (mode_) {
         case Mode::kNoise:
-            // Map [-1,1] → [0,1]
             t = noise3(x, y, z) * 0.5 + 0.5;
             break;
         case Mode::kTurbulence:
             t = turbulence(x, y, z, octaves_);
             break;
         case Mode::kMarble:
-            // Classic marble: sine wave along one axis, warped by turbulence.
+            // Classic marble: sine wave along axis warped by turbulence.
             t = 0.5 + 0.5 * std::sin(x + 5.0 * turbulence(x, y, z, octaves_));
             break;
         }
@@ -206,10 +175,6 @@ private:
     float     kd_;
     float     shininess_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 float readFloat(const libconfig::Setting& s)
 {
@@ -240,9 +205,8 @@ void* create(const libconfig::Setting& cfg)
         Mode mode = Mode::kTurbulence;
         if (cfg.exists("mode")) {
             const std::string m = static_cast<const char*>(cfg["mode"]);
-            if      (m == "noise")       mode = Mode::kNoise;
-            else if (m == "marble")      mode = Mode::kMarble;
-            // "turbulence" → default
+            if      (m == "noise")  mode = Mode::kNoise;
+            else if (m == "marble") mode = Mode::kMarble;
         }
 
         const int clampedOctaves = (octaves < 1) ? 1 : (octaves > 8 ? 8 : octaves);

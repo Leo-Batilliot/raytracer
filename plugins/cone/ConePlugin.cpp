@@ -1,23 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Cone primitive plugin (T2.2).
-//
-// Canonical finite cone: apex at y = +halfH, base disk at y = -halfH,
-// base radius = `radius`, axis aligned with Y. Config `center` = midpoint
-// between apex and base.
-//
-// Implicit surface: f(x,y,z) = x² + z² − k²·(halfH−y)² = 0
-//   where k = radius / height
-//
-// Quadratic: a·t² + 2·half_b·t + c = 0
-//   a      = Dx² + Dz² − k²·Dy²
-//   half_b = Ox·Dx + Oz·Dz + k²·α·Dy    (α = halfH − Oy)
-//   c      = Ox² + Oz² − k²·α²
-//
-// Body normal: ∇f = (hx, k²·(halfH−hy), hz)  (normalize before use).
-// Base cap at y = −halfH, normal = (0,−1,0).
-// No top cap (apex is a point).
-
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -31,10 +11,13 @@ namespace {
 
 constexpr double kEps = 1e-8;
 
-// ----------------------------------------------------------------
-// Cone
-// ----------------------------------------------------------------
-
+// Finite cone: apex at y = +halfH, base disk at y = -halfH, base radius = `radius`.
+// Implicit surface: f(x,y,z) = x² + z² − k²·(halfH−y)² = 0,  k = radius/height.
+// Quadratic coefficients:
+//   a      = Dx² + Dz² − k²·Dy²
+//   half_b = Ox·Dx + Oz·Dz + k²·α·Dy    (α = halfH − Oy)
+//   c      = Ox² + Oz² − k²·α²
+// Body normal: ∇f = (hx, k²·(halfH−hy), hz), normalised.
 class Cone final : public rt::IPrimitive {
 public:
     Cone(rt::Vector3 center, double radius, double height)
@@ -47,14 +30,12 @@ public:
 
     bool intersect(const rt::Ray& ray, rt::HitRecord& rec) const override
     {
-        // Shift ray to object space (centre at origin).
         const rt::Vector3 orig = ray.origin - center_;
         const rt::Vector3 dir  = ray.direction;
 
-        const double alpha = halfH_ - orig.y;   // Y distance from apex at t=0
+        const double alpha = halfH_ - orig.y;
         const double k2    = k_ * k_;
 
-        // ── Body quadratic ────────────────────────────────────────────────
         const double a      = dir.x*dir.x + dir.z*dir.z - k2*dir.y*dir.y;
         const double half_b = orig.x*dir.x + orig.z*dir.z + k2*alpha*dir.y;
         const double c      = orig.x*orig.x + orig.z*orig.z - k2*alpha*alpha;
@@ -69,7 +50,6 @@ public:
             const double disc = half_b*half_b - a*c;
             if (disc >= 0.0) {
                 const double sqrtD = std::sqrt(disc);
-                // Always try the smaller t first (correct for both a>0 and a<0).
                 const double tA = (-half_b - sqrtD) / a;
                 const double tB = (-half_b + sqrtD) / a;
                 const double tNear = std::min(tA, tB);
@@ -83,7 +63,7 @@ public:
                     const double hx = orig.x + t * dir.x;
                     const double hz = orig.z + t * dir.z;
 
-                    // Outward normal = ∇f normalised.
+                    // ∇f normalised.
                     rt::Vector3  outward{hx, k2*(halfH_ - hy), hz};
                     const double len = outward.length();
                     if (len < kEps) continue;
@@ -100,12 +80,12 @@ public:
                     bestUV     = {u, v};
                     bestFront  = front;
                     hit        = true;
-                    break;  // tNear is smallest valid — stop
+                    break;
                 }
             }
         }
 
-        // ── Base cap (y = −halfH) ────────────────────────────────────────
+        // Base cap at y = −halfH.
         if (std::abs(dir.y) > kEps) {
             const double t = (-halfH_ - orig.y) / dir.y;
             if (t >= ray.tMin && t < tBest) {
@@ -150,20 +130,12 @@ private:
     double      k_;     // radius / height = half-angle tangent
 };
 
-// ----------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------
-
 static double readScalar(const libconfig::Setting& s)
 {
     if (s.getType() == libconfig::Setting::TypeInt)
         return static_cast<double>(static_cast<int>(s));
     return static_cast<double>(s);
 }
-
-// ----------------------------------------------------------------
-// Plugin ABI
-// ----------------------------------------------------------------
 
 static void* create(const libconfig::Setting& cfg)
 {

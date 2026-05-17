@@ -1,18 +1,7 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Renderer: tile-based rendering pipeline (T0.14).
-//
-// renderAll() partitions the image into kTileSize×kTileSize tiles and
-// calls renderTile() for each. This layout is ready for parallelism
-// (T3.2): each tile is an independent unit of work with no shared writes.
-//
-// Shading policy (grows across phases):
-//   T0.14 : sky gradient only (no geometry).
-//   T0.15+: scene_.intersect() drives material shade or sky fallback.
-
 #ifndef RAYTRACER_CORE_RENDERER_HPP
 #define RAYTRACER_CORE_RENDERER_HPP
 
+#include <atomic>
 #include "core/AASetting.hpp"
 #include "core/Camera.hpp"
 #include "core/Image.hpp"
@@ -30,16 +19,12 @@ public:
     void renderTile(int x0, int y0, int x1, int y1, Image& img) const;
 
     // Render every tile in img (row-major tile order).
-    void renderAll(Image& img) const;
+    // If cancel is set to true by the caller, workers stop after the current tile.
+    void renderAll(Image& img, std::atomic<bool>* cancel = nullptr) const;
 
 private:
     Color shade(const Ray& ray, int depth = 0) const;
-
-    // Returns the anti-aliased color for pixel (px, py).
-    // Dispatches to uniformSample or adaptive logic based on aa_.
     Color shadePixel(int px, int py) const;
-
-    // Averages N×N uniformly-stratified samples for pixel (px, py).
     Color uniformSample(int px, int py, int n) const;
 
     const Scene&  scene_;

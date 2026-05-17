@@ -1,15 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Cylinder primitive plugin (T2.1).
-//
-// Canonical finite cylinder: axis aligned with Y, centre at `center`,
-// radius `radius`, total height `height` (extends ±height/2 from centre).
-//
-// Intersection in two steps:
-//   1. Infinite-cylinder body (solve quadratic in xz-plane).
-//   2. Flat caps at y = ±halfH (disk test).
-// The closest valid t in [tMin, tMax] wins.
-
 #include <cmath>
 #include <numbers>
 
@@ -22,10 +10,8 @@ namespace {
 
 constexpr double kEps = 1e-8;
 
-// ----------------------------------------------------------------
-// Cylinder
-// ----------------------------------------------------------------
-
+// Finite cylinder: axis aligned with Y, centre at `center`,
+// radius `radius`, total height `height` (extends ±height/2 from centre).
 class Cylinder final : public rt::IPrimitive {
 public:
     Cylinder(rt::Vector3 center, double radius, double height)
@@ -35,11 +21,10 @@ public:
 
     bool intersect(const rt::Ray& ray, rt::HitRecord& rec) const override
     {
-        // Shift ray to cylinder's local frame (centre at origin).
         const rt::Vector3 orig = ray.origin  - center_;
         const rt::Vector3 dir  = ray.direction;
 
-        // ── Body (infinite cylinder, axis Y) ─────────────────────────────
+        // Infinite-cylinder body (axis Y).
         const double a      = dir.x * dir.x + dir.z * dir.z;
         const double half_b = orig.x * dir.x + orig.z * dir.z;
         const double c      = orig.x * orig.x + orig.z * orig.z
@@ -55,7 +40,6 @@ public:
             const double disc = half_b * half_b - a * c;
             if (disc >= 0.0) {
                 const double sqrtD = std::sqrt(disc);
-                // Near root first, then far.
                 for (int sign : {-1, 1}) {
                     const double t = (-half_b + sign * sqrtD) / a;
                     if (t < ray.tMin || t >= tBest) continue;
@@ -76,12 +60,12 @@ public:
                     bestUV     = {u, v};
                     bestFront  = front;
                     hit        = true;
-                    break;  // near root is closest — stop
+                    break;
                 }
             }
         }
 
-        // ── Caps (top: y = +halfH, bottom: y = −halfH) ───────────────────
+        // Caps at y = ±halfH.
         if (std::abs(dir.y) > kEps) {
             for (int side : {-1, 1}) {
                 const double capY = static_cast<double>(side) * halfH_;
@@ -131,20 +115,12 @@ private:
     double      halfH_;
 };
 
-// ----------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------
-
 static double readScalar(const libconfig::Setting& s)
 {
     if (s.getType() == libconfig::Setting::TypeInt)
         return static_cast<double>(static_cast<int>(s));
     return static_cast<double>(s);
 }
-
-// ----------------------------------------------------------------
-// Plugin ABI
-// ----------------------------------------------------------------
 
 static void* create(const libconfig::Setting& cfg)
 {

@@ -1,16 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Point light plugin (T4.10).
-// Models an omnidirectional light source at a fixed position in the scene.
-//
-// Differences from directional light:
-//   - Direction is computed per sample: normalize(position - surfacePoint).
-//   - Distance is finite: shadow rays stop at the light position (correct
-//     self-shadowing and correct occlusion by objects behind the light).
-//   - Optional attenuation: radiance *= 1 / (c + l*d + q*d²).
-//     Default (c=1, l=0, q=0) gives uniform intensity (no falloff).
-//     Setting q=1 gives physically-based inverse-square falloff (1/d²).
-//
 // Config block:
 //   lights:
 //   {
@@ -25,8 +12,6 @@
 //           }
 //       );
 //   };
-//
-// Ticket: T4.10.
 
 #include <cmath>
 #include <limits>
@@ -51,10 +36,6 @@ double readDouble(const libconfig::Setting& s)
         return static_cast<double>(static_cast<int>(s));
     return static_cast<double>(s);
 }
-
-// ----------------------------------------------------------------
-// PointLight
-// ----------------------------------------------------------------
 
 class PointLight final : public rt::ILight {
 public:
@@ -89,10 +70,6 @@ private:
     double      kL_;
     double      kQ_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {

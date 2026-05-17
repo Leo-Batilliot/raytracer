@@ -1,5 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-
 #include "output/PPMWriter.hpp"
 
 #include <cmath>
@@ -33,7 +31,6 @@ uint8_t linearToSRGB8(float linear) noexcept
 void PPMWriter::write(std::ostream& out, int width, int height,
                       const std::vector<Color>& pixels)
 {
-    // P6 header
     out << "P6\n" << width << ' ' << height << "\n255\n";
 
     for (const auto& c : pixels) {

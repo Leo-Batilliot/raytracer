@@ -1,10 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// FlatColor material plugin (T1.5).
-// Returns the stored albedo unchanged — no lighting, no BRDF.
-// The renderer (T1.6) applies ambient + Lambert shading on top of this
-// albedo; FlatColor's role is purely to supply the surface colour.
-
 #include <libconfig.h++>
 
 #include "interfaces/IMaterial.hpp"
@@ -19,10 +12,6 @@ float readFloat(const libconfig::Setting& s)
     return static_cast<float>(static_cast<double>(s));
 }
 
-// ----------------------------------------------------------------
-// FlatColor
-// ----------------------------------------------------------------
-
 class FlatColor final : public rt::IMaterial {
 public:
     explicit FlatColor(rt::Color albedo) : albedo_(albedo) {}
@@ -35,10 +24,6 @@ public:
 private:
     rt::Color albedo_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {

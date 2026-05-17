@@ -1,22 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Vector3: 3D vector stored in double precision.
-//
-// The main math type of the raytracer. Used for points, directions
-// and normals. Double precision was chosen over float to avoid
-// accumulating error in long chains of transforms / intersections;
-// the Color type uses float instead (see Color.hpp).
-//
-// Ticket: T0.4.
-// Immutability: every operator returns a NEW Vector3. No in-place
-// mutation is exposed (see rules/common coding-style.md).
-//
-// Hot paths (intersect/shade/tile loop) must NOT throw — that is why
-// the only throwing method here, `normalized()`, is expected to be
-// called at construction time (e.g. parsing camera.up), not inside the
-// render loop. When a renderer needs a possibly-zero vector, it should
-// check `lengthSquared() > 0` and branch explicitly.
-
 #ifndef RAYTRACER_MATH_VECTOR3_HPP
 #define RAYTRACER_MATH_VECTOR3_HPP
 
@@ -72,7 +53,7 @@ struct Vector3 {
     constexpr double lengthSquared() const noexcept { return dot(*this); }
     double length() const noexcept { return std::sqrt(lengthSquared()); }
 
-    // Throws rt::MathError if this vector has zero length.
+    // Throws rt::MathError if zero-length.
     Vector3 normalized() const
     {
         const double len = length();
@@ -83,7 +64,6 @@ struct Vector3 {
     }
 };
 
-// Symmetric scalar multiplication: 2.0 * v.
 constexpr Vector3 operator*(double s, const Vector3& v) noexcept
 {
     return v * s;

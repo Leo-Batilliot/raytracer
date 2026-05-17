@@ -1,10 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Sphere primitive plugin (T1.1) — real ray/sphere intersection in
-// object space. Center and radius are read from the scene config so
-// the sphere is directly positioned in world space (no Transform yet;
-// that arrives in T2.3).
-
 #include <cmath>
 #include <numbers>
 
@@ -15,19 +8,12 @@
 
 namespace {
 
-// ----------------------------------------------------------------
-// Helper: read a scalar setting that may be TypeInt or TypeFloat.
-// ----------------------------------------------------------------
 double readScalar(const libconfig::Setting& s)
 {
     if (s.getType() == libconfig::Setting::TypeInt)
         return static_cast<double>(static_cast<int>(s));
     return static_cast<double>(s);
 }
-
-// ----------------------------------------------------------------
-// Sphere
-// ----------------------------------------------------------------
 
 class Sphere final : public rt::IPrimitive {
 public:
@@ -48,7 +34,6 @@ public:
 
         const double sqrtd = std::sqrt(disc);
 
-        // Try the near root first, then the far root.
         double t = (-half_b - sqrtd) / a;
         if (t < ray.tMin || t > ray.tMax) {
             t = (-half_b + sqrtd) / a;
@@ -62,7 +47,7 @@ public:
         const rt::Vector3 outward = (rec.point - center_) / radius_;
         rec.frontFace = ray.direction.dot(outward) < 0.0;
         rec.normal    = rec.frontFace ? outward : -outward;
-        rec.uv        = uvAt(outward);  // outward is already on the unit sphere
+        rec.uv        = uvAt(outward);
         rec.material  = nullptr;
         return true;
     }
@@ -75,7 +60,7 @@ public:
 
     rt::Vector2 uvAt(const rt::Vector3& p) const override
     {
-        // Spherical UV mapping on the unit sphere (p is normalized).
+        // Spherical UV: theta = acos(-p.y), phi = atan2(-p.z, p.x) + pi.
         const double theta = std::acos(-p.y);
         const double phi   = std::atan2(-p.z, p.x) + std::numbers::pi;
         return rt::Vector2{
@@ -88,10 +73,6 @@ private:
     rt::Vector3 center_;
     double      radius_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {

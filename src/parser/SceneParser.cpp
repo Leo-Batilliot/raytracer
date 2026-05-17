@@ -1,5 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-
 #include "parser/SceneParser.hpp"
 
 #include <iostream>
@@ -22,10 +20,6 @@
 
 namespace rt {
 
-// ----------------------------------------------------------------
-// Constructor — open + parse
-// ----------------------------------------------------------------
-
 SceneParser::SceneParser(const std::filesystem::path& cfgPath)
 {
     try {
@@ -40,10 +34,6 @@ SceneParser::SceneParser(const std::filesystem::path& cfgPath)
     }
 }
 
-// ----------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------
-
 double SceneParser::readScalar(const libconfig::Setting& s)
 {
     if (s.getType() == libconfig::Setting::TypeInt)
@@ -53,8 +43,6 @@ double SceneParser::readScalar(const libconfig::Setting& s)
 
 Vector3 SceneParser::readVec3(const libconfig::Setting& s)
 {
-    // libconfig stores integers and floats as distinct types.
-    // Use double() cast to accept both from the config file.
     auto get = [&](const char* key) -> double {
         const libconfig::Setting& f = s[key];
         if (f.getType() == libconfig::Setting::TypeInt)
@@ -63,10 +51,6 @@ Vector3 SceneParser::readVec3(const libconfig::Setting& s)
     };
     return {get("x"), get("y"), get("z")};
 }
-
-// ----------------------------------------------------------------
-// parseCamera
-// ----------------------------------------------------------------
 
 CameraConfig SceneParser::parseCamera() const
 {
@@ -78,7 +62,6 @@ CameraConfig SceneParser::parseCamera() const
         cfg.lookAt   = readVec3(cam["lookAt"]);
         cfg.up       = readVec3(cam["up"]);
 
-        // fov may be stored as float or double in the config.
         const libconfig::Setting& fovSetting = cam["fov"];
         if (fovSetting.getType() == libconfig::Setting::TypeInt)
             cfg.fov = static_cast<double>(static_cast<int>(fovSetting));
@@ -98,10 +81,6 @@ CameraConfig SceneParser::parseCamera() const
     }
 }
 
-// ----------------------------------------------------------------
-// parseAntialiasing  (T4.9)
-// ----------------------------------------------------------------
-
 AASetting SceneParser::parseAntialiasing() const
 {
     AASetting aa;
@@ -117,10 +96,6 @@ AASetting SceneParser::parseAntialiasing() const
     if (aa.samples > 8) aa.samples = 8;
     return aa;
 }
-
-// ----------------------------------------------------------------
-// buildPrimitiveList  (shared helper — T4.5)
-// ----------------------------------------------------------------
 
 void SceneParser::buildPrimitiveList(const libconfig::Setting& parent,
     const char* key,
@@ -151,7 +126,6 @@ void SceneParser::buildPrimitiveList(const libconfig::Setting& parent,
             static_cast<IPrimitive*>(raw),
             [desc](IPrimitive* p) { desc->destroy(p); });
 
-        // Optional material reference.
         const IMaterial* mat = nullptr;
         if (entry.exists("material")) {
             const std::string matName = static_cast<const char*>(entry["material"]);
@@ -161,7 +135,7 @@ void SceneParser::buildPrimitiveList(const libconfig::Setting& parent,
                     << "]: material '" << matName << "' not found — ignored\n";
         }
 
-        // Optional rotation (degrees per axis, applied X → Y → Z).
+        // Rotation applied X → Y → Z (degrees).
         Transform rotation = Transform::identity();
         if (entry.exists("rotate")) {
             constexpr double kDeg2Rad = std::numbers::pi / 180.0;
@@ -174,7 +148,6 @@ void SceneParser::buildPrimitiveList(const libconfig::Setting& parent,
                 rotation = Transform::rotationZ(readScalar(rot["z"]) * kDeg2Rad) * rotation;
         }
 
-        // Optional translation (applied after rotation).
         Transform translation = Transform::identity();
         if (entry.exists("translate")) {
             const Vector3 t = readVec3(entry["translate"]);
@@ -185,10 +158,6 @@ void SceneParser::buildPrimitiveList(const libconfig::Setting& parent,
             std::move(prim), mat, translation * rotation));
     }
 }
-
-// ----------------------------------------------------------------
-// parsePrimitives
-// ----------------------------------------------------------------
 
 void SceneParser::parsePrimitives(SceneBuilder& builder,
     const PluginLoader& loader) const
@@ -207,10 +176,6 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
         builder.addNode(std::move(n));
 }
 
-// ----------------------------------------------------------------
-// parseGroups  (T4.5 — scene graph)
-// ----------------------------------------------------------------
-
 void SceneParser::parseGroups(SceneBuilder& builder,
     const PluginLoader& loader) const
 {
@@ -221,7 +186,6 @@ void SceneParser::parseGroups(SceneBuilder& builder,
     for (int i = 0, n = groups.getLength(); i < n; ++i) {
         const libconfig::Setting& entry = groups[i];
 
-        // Parse group transform (translate + rotate, same convention as primitives).
         Transform rotation = Transform::identity();
         if (entry.exists("rotate")) {
             constexpr double kDeg2Rad = std::numbers::pi / 180.0;
@@ -240,7 +204,6 @@ void SceneParser::parseGroups(SceneBuilder& builder,
         }
         const Transform groupTransform = translation * rotation;
 
-        // Parse children (same primitive schema as the `primitives` section).
         if (!entry.exists("children")) {
             std::cerr << "raytracer: warning: group[" << i
                 << "]: no 'children' section — skipping\n";
@@ -256,7 +219,6 @@ void SceneParser::parseGroups(SceneBuilder& builder,
 
         if (childNodes.empty()) continue;
 
-        // Assemble: wrap children in a GroupNode, then apply the group transform.
         auto group = std::make_shared<GroupNode>();
         for (auto& child : childNodes)
             group->addChild(std::move(child));
@@ -264,10 +226,6 @@ void SceneParser::parseGroups(SceneBuilder& builder,
         builder.addNode(std::make_shared<TransformNode>(std::move(group), groupTransform));
     }
 }
-
-// ----------------------------------------------------------------
-// parseLights
-// ----------------------------------------------------------------
 
 void SceneParser::parseLights(SceneBuilder& builder,
     const PluginLoader& loader) const
@@ -298,14 +256,10 @@ void SceneParser::parseLights(SceneBuilder& builder,
         }
     };
 
-    loadList("ambient",     "ambient");     // T1.3
-    loadList("directional", "directional"); // T1.4
-    loadList("point",       "point");       // T4.10
+    loadList("ambient",     "ambient");
+    loadList("directional", "directional");
+    loadList("point",       "point");
 }
-
-// ----------------------------------------------------------------
-// parseMaterials
-// ----------------------------------------------------------------
 
 void SceneParser::parseMaterials(SceneBuilder& builder,
     const PluginLoader& loader) const

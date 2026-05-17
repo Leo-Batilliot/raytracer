@@ -1,159 +1,237 @@
-# Raytracer
+# Raytracer — G-OOP-400
 
-Moteur de raytracing C++ modulaire (projet Epitech **G-OOP-400-LIL-4-1-raytracer-16**), architecturé autour d'un cœur minimal et d'un système de plugins dynamiques (`libdl`).
-
-> 📚 **Documentation du projet**
->
-> - [`PROJECT.md`](./PROJECT.md) — hub descriptif : philosophie, exigences du sujet, vue d'ensemble.
-> - [`PLAN.md`](./PLAN.md) — feuille de route technique : phases, tickets, critères d'acceptation.
-> - [`DOCUMENTATION.md`](./DOCUMENTATION.md) — journal technique : historique des versions, choix, patches.
-> - [`MATHS.md`](./MATHS.md) — Explications mathématiques : théorie et pratique du raytracing, ainsi que la géométrie spatiale.
-> 
----
-
-## 🚀 Build
-
-### Prérequis
-
-- Compilateur C++20 (`g++ ≥ 11` ou `clang++ ≥ 13`)
-- `cmake ≥ 3.16`
-- `libconfig++`
-- `libdl` (fourni par la libc)
-- *(optionnel, bonus)* `SFML` pour l'affichage temps réel
-
-### Compilation
-
-```bash
-make           # Build Release par défaut (via CMake)
-make re        # Rebuild complet
-make clean     # Supprime les artefacts de compilation
-make fclean    # Supprime aussi le binaire et les plugins
-```
-
-Ou directement avec CMake :
-
-```bash
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . -j$(nproc)
-```
-
-Après compilation :
-
-```
-./raytracer          # exécutable à la racine
-./plugins/*.so       # plugins chargés dynamiquement au runtime
-```
+A modular raytracer written in C++20 for Epitech, built around a dynamic plugin system. Every primitive, light, and material is a separately compiled `.so` loaded at runtime — adding a new shape is one file and one CMake line.
 
 ---
 
-## 📖 Usage
+## What is a raytracer?
+
+For each pixel of the image, a ray is fired from the camera through that pixel into the scene. The program finds the closest object it hits, then calculates the color based on the material and all light sources. Reflections, refractions, and shadows each fire additional rays recursively. The result is written as a PPM image.
+
+---
+
+## Build
+
+**Requirements:** `g++ ≥ 11` (C++20), `cmake ≥ 3.16`, `libconfig++`, `libdl` (bundled with glibc). Optional: `SFML 3` for live preview.
 
 ```bash
+make           # Release build (default)
+make re        # Full rebuild
+make clean     # Remove build artefacts
+make fclean    # Also remove binary and plugins
+```
+
+Output: `./raytracer` at the root, plugins in `./plugins/*.so`.
+
+---
+
+## Usage
+
+```bash
+./raytracer scenes/demo_phong.cfg > output.ppm   # render to file (no window)
+./raytracer scenes/demo_phong.cfg                # live SFML preview (if built)
 ./raytracer --help
-USAGE: ./raytracer <SCENE_FILE>
-  SCENE_FILE: scene configuration
 ```
 
-Exemple :
-
-```bash
-./raytracer scenes/demo_sphere.cfg > output.ppm
-```
-
-Le raytracer écrit l'image au format **PPM (P6 binaire)** sur la sortie standard, ou dans un fichier selon le mode d'utilisation prévu.
-
-Codes de retour :
-
-- `0` — succès
-- `84` — erreur (argument invalide, fichier introuvable, erreur de parsing, etc.)
+- Exit `0` on success, `84` on any error.
+- All error messages go to `stderr`, the PPM image to `stdout`.
+- When SFML is available and stdout is a terminal, a live window shows the render progressing tile by tile. Press **ESC** or close the window to abort.
 
 ---
 
-## 🗂️ Structure du dépôt
+## Scene file format
 
-```
-.
-├── CMakeLists.txt         # build system (racine)
-├── Makefile               # wrapper vers CMake
-├── raytracer              # binaire (généré)
-├── plugins/               # plugins .so (générés)
-├── src/
-│   ├── main.cpp
-│   ├── core/              # Scene, Renderer, Camera, SceneBuilder
-│   ├── math/              # Vector3, Matrix4, Color, Transform
-│   ├── interfaces/        # IPrimitive, ILight, IMaterial, plugin ABI
-│   ├── primitives/        # (code commun aux plugins de primitives)
-│   ├── lights/            # (code commun aux plugins de lumières)
-│   ├── materials/         # (code commun aux plugins de matériaux)
-│   ├── parser/            # SceneParser (libconfig++)
-│   ├── plugins/           # PluginLoader (libdl)
-│   └── output/            # PPMWriter, SFMLDisplay (bonus)
-├── scenes/                # scènes de démo (.cfg)
-├── screenshots/           # rendus de référence (.ppm)
-├── tests/                 # tests unitaires
-├── bonus/                 # code bonus séparable
-├── PROJECT.md              # hub descriptif du projet
-├── PLAN.md                # roadmap détaillée
-└── DOCUMENTATION.md       # historique des versions
-```
-
----
-
-## 🎨 Format des scènes
-
-Les scènes utilisent la syntaxe `libconfig++`. Exemple minimal :
+Scenes use [libconfig++](http://hyperrealm.github.io/libconfig/) syntax. All fields shown below are mandatory unless marked *optional*.
 
 ```cfg
 camera:
 {
-    resolution = { width = 1920; height = 1080; };
-    position = { x = 0; y = -100; z = 20; };
-    rotation = { x = 0; y = 0; z = 0; };
-    fieldOfView = 72.0;
+    position = { x = 0.0; y = 3.0; z = 8.0; };
+    lookAt   = { x = 0.0; y = 0.5; z = 0.0; };
+    up       = { x = 0.0; y = 1.0; z = 0.0; };
+    fov    = 50.0;    // degrees
+    width  = 800;
+    height = 600;
 };
 
-materials = (
-    { name = "red_matte"; type = "flat"; color = { r = 255; g = 64; b = 64; }; }
-);
+// Optional antialiasing
+antialiasing:
+{
+    samples   = 3;     // samples per side: 1=off, 2=4spp, 3=9spp …
+    adaptive  = false; // only refine high-variance (edge) pixels
+    threshold = 0.05;  // variance trigger for adaptive mode [0,1]
+};
+
+// Named materials — reference them by name in primitives
+materials:
+{
+    red_phong: {
+        type = "phong";
+        color = { r = 0.8; g = 0.1; b = 0.1; };
+        ka = 0.12; kd = 0.70; ks = 0.40; shininess = 80.0;
+    };
+    mirror_mat: {
+        type = "mirror";
+        color = { r = 0.95; g = 0.95; b = 0.95; };
+        reflectivity = 0.92;
+        ka = 0.05; kd = 0.10; ks = 0.80; shininess = 256.0;
+    };
+};
 
 primitives:
 {
     spheres = (
-        { x = 0; y = 0; z = 0; r = 20; material = "red_matte"; }
+        { center = { x = 0.0; y = 0.5; z = 0.0; }; radius = 0.5;
+          material = "red_phong";
+          translate = { x = 1.0; y = 0.0; z = 0.0; };  // optional
+          rotate    = { x = 0.0; y = 45.0; z = 0.0; }; // optional, degrees
+        }
     );
+    planes = (
+        { normal = { x = 0.0; y = 1.0; z = 0.0; }; distance = 0.0;
+          material = "red_phong"; }
+    );
+    // Also: cylinders, cones — same translate/rotate/material fields
 };
+
+// Optional groups — shared transform applied to all children
+groups = (
+    {
+        translate = { x = 3.0; y = 0.0; z = 0.0; };
+        rotate    = { x = 0.0; y = 45.0; z = 0.0; };
+        children:
+        {
+            spheres = ( { center = { x=0; y=0.5; z=0; }; radius=0.5;
+                          material="red_phong"; } );
+        };
+    }
+);
 
 lights:
 {
-    ambient = 0.3;
+    ambient = (
+        { color = { r = 1.0; g = 1.0; b = 1.0; }; intensity = 0.15; }
+    );
     directional = (
-        { direction = { x = -1; y = -1; z = -1; }; color = { r = 255; g = 255; b = 255; }; }
+        { direction = { x = -1.0; y = -2.0; z = -1.0; };
+          color = { r = 1.0; g = 0.96; b = 0.88; }; intensity = 0.85; }
+    );
+    point = (
+        { position  = { x = 2.0; y = 4.0; z = 2.0; };
+          color     = { r = 1.0; g = 0.85; b = 0.6; };
+          intensity = 4.0;
+          constant  = 1.0; linear = 0.14; quadratic = 0.07; } // optional
     );
 };
 ```
 
-Les scènes disponibles sont listées dans [`scenes/`](./scenes/). Leurs rendus de référence sont dans [`screenshots/`](./screenshots/).
+---
+
+## Primitives
+
+| Type | Config key | Required fields |
+|------|-----------|-----------------|
+| Sphere | `spheres` | `center {x,y,z}`, `radius` |
+| Plane | `planes` | `normal {x,y,z}`, `distance` |
+| Cylinder | `cylinders` | `center {x,y,z}`, `radius`, `height` |
+| Cone | `cones` | `center {x,y,z}`, `radius`, `height` |
+
+All primitives accept optional `translate`, `rotate`, and `material` fields.
 
 ---
 
-## 🧩 Architecture
+## Materials
 
-Le moteur repose sur :
+| Type | Description | Key fields |
+|------|-------------|------------|
+| `flat_color` | Uniform color, no shading | `color {r,g,b}` |
+| `phong` | Diffuse + specular highlights | `color`, `ka`, `kd`, `ks`, `shininess` |
+| `mirror` | Reflective surface | `color`, `reflectivity` (0–1), phong params |
+| `glass` | Refractive transparent | `transparency` (0–1), `ior` (1.0–3.0), `color` |
+| `checkerboard` | Procedural checkerboard | `color1`, `color2`, `scale`, phong params |
+| `perlin` | Procedural Perlin noise | `color1`, `color2`, `scale`, `octaves`, `mode` (`noise`/`turbulence`/`marble`) |
+| `texture` | Image from PPM file | `file` (path), `scale_u`, `scale_v`, phong params |
 
-- **Interfaces C++ pures** : `IPrimitive`, `ILight`, `IMaterial`, `INode`.
-- **Plugins dynamiques** : chaque primitive / lumière / matériau est compilé en `.so` chargé au runtime par un `PluginLoader` qui encapsule `libdl`.
-- **Scene graph Composite** : les objets forment un arbre (`GroupNode` + `LeafNode`), même interface pour les cas simples et complexes.
-- **Design patterns** : Factory (plugins), Composite (scene graph), Builder (parser), Strategy (matériaux).
-
-L'exécutable `raytracer` **n'est pas linké** aux plugins : `ldd ./raytracer` ne doit jamais lister de `raytracer_*.so`.
-
-Voir [`PROJECT.md`](./PROJECT.md) et [`PLAN.md`](./PLAN.md) pour les détails.
+All materials except `flat_color` support `ka`, `kd`, `ks`, `shininess` for Phong shading.
 
 ---
 
-## 👤 Auteurs
+## Lights
 
-- **Léo Batilliot**
-- **Gabin Wilson**
-- **Mathis Korejezak**
+| Type | Description | Key fields |
+|------|-------------|------------|
+| `ambient` | Uniform global light | `color`, `intensity` |
+| `directional` | Parallel light from infinite distance | `direction {x,y,z}`, `color`, `intensity` |
+| `point` | Positional light with optional falloff | `position {x,y,z}`, `color`, `intensity`, `constant`, `linear`, `quadratic` |
+
+Multiple lights of any type can be combined in each scene.
+
+---
+
+## How it works — step by step
+
+**0 — Architecture (foundations)**
+The core has no geometry — it only defines abstract interfaces (`IPrimitive`, `ILight`, `IMaterial`, `INode`) and a dynamic plugin loader. Every shape and material is a `.so` compiled separately. `libdl` loads them at startup, `libconfig++` reads the scene file.
+
+**1 — Camera and rays**
+A pinhole camera model converts each pixel `(x, y)` into a 3D ray using the camera position, look-at point, and field of view. The ray is `origin + t * direction`.
+
+**2 — Intersection**
+For each ray, the scene finds the closest hit across all objects. Each primitive solves its own geometric equation (e.g., sphere: quadratic formula, plane: linear, cylinder: quadratic on XZ, cone: quadratic with varying radius).
+
+**3 — Lighting (Lambert + Phong)**
+At the hit point, the renderer accumulates light contributions. Ambient light is constant. For each directional or point light: a shadow ray checks occlusion, then Lambert diffuse `(N·L)` and Phong specular `(R·V)^shininess` are computed. Point lights attenuate with distance: `1 / (c + l·d + q·d²)`.
+
+**4 — Transforms**
+Objects live in canonical local space (sphere centered at origin, etc.). A cached 4×4 transform matrix moves rays to local space before intersection and results back to world space. Normals use the transpose of the inverse: `(M⁻¹)ᵀ · n`.
+
+**5 — BVH acceleration**
+Objects are sorted into a binary tree by their bounding boxes. Each ray first tests the bounding box of a subtree — if it misses, the entire subtree is skipped. Reduces intersection work from O(N) to O(log N).
+
+**6 — Multi-threaded rendering**
+The image is split into 64×64 tiles. An atomic index distributes tiles to worker threads with no mutex. The scene is immutable after construction, so threads never conflict.
+
+**7 — Reflections**
+When a mirror material is hit, a reflected ray `r = d − 2(d·N)N` is fired. The returned color blends with the direct color according to `reflectivity`. Maximum 8 bounces.
+
+**8 — Refractions**
+Transparent materials (glass, water) deflect rays using Snell's law. The Schlick approximation handles the Fresnel blend between reflection and refraction near grazing angles. Total internal reflection is handled when the refraction angle exceeds 90°.
+
+**9 — Procedural textures**
+Checkerboard uses `floor(x) + floor(y) + floor(z)` parity in world space. Perlin noise uses Ken Perlin's improved lattice noise (2002) with a smoothstep interpolation; turbulence sums multiple octaves of |noise|; marble wraps turbulence inside a sine wave.
+
+**10 — Antialiasing**
+Uniform supersampling fires N×N rays per pixel on a stratified grid and averages them. Adaptive mode starts with 2×2; if the four samples differ by more than a threshold, it upgrades to N×N. Smooth areas stay at 4 samples, edges get full quality.
+
+**11 — SFML live preview**
+When stdout is a terminal and SFML 3 is available, a window opens and tiles appear as they're computed. ESC or closing the window cancels the render. When piping to a file, the window is suppressed.
+
+---
+
+## Architecture overview
+
+```
+raytracer (binary)
+├── src/core/        Camera, Renderer (tiles, threads, AA), Scene, SceneBuilder (Builder pattern)
+├── src/interfaces/  IPrimitive, INode (Composite), ILight, IMaterial (Strategy), plugin ABI
+├── src/math/        Vector2/3, Color, Matrix4, Transform (cached inverse)
+├── src/parser/      SceneParser — libconfig++ → SceneBuilder
+├── src/plugins/     PluginLoader — dlopen/dlsym encapsulation
+└── src/output/      PPMWriter, SFMLDisplay
+
+plugins/ (loaded at runtime, never linked to the binary)
+├── sphere, plane, cylinder, cone          — primitives
+├── ambient, directional, point_light      — lights
+├── flat_color, phong, mirror, glass       — materials
+└── checkerboard, perlin, texture          — procedural/file textures
+```
+
+Design patterns used: **Factory** (plugin system), **Composite** (scene graph `INode`/`GroupNode`), **Builder** (`SceneBuilder`), **Strategy** (`IMaterial::shade`).
+
+---
+
+## Authors
+
+- Léo Batilliot
+- Gabin Wilson
+- Mathis Korejezak

@@ -1,5 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-
 #include "core/Camera.hpp"
 
 #include <cmath>
@@ -10,10 +8,10 @@ namespace rt {
 Camera::Camera(const CameraConfig& cfg)
     : width_(cfg.width), height_(cfg.height)
 {
-    // Orthonormal basis: w points from lookAt toward position (camera looks along -w).
+    // w points from lookAt toward position; camera looks along -w.
     const Vector3 w = (cfg.position - cfg.lookAt).normalized();
     const Vector3 u = cfg.up.cross(w).normalized();
-    const Vector3 v = w.cross(u);  // already unit: w and u are orthonormal
+    const Vector3 v = w.cross(u);
 
     const double halfH = std::tan(cfg.fov * std::numbers::pi / 360.0);
     const double halfW = halfH * static_cast<double>(cfg.width) / cfg.height;

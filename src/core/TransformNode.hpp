@@ -1,23 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// TransformNode: wraps any INode with a Transform for scene-graph grouping
-// (T4.5 — bonus "scene graph" 2 pts).
-//
-// Enables hierarchical transforms: a group's parent transform is applied to
-// all its children by transforming the ray to group-local space before
-// delegating to the wrapped child node.
-//
-// Ray transform : localRay  = inverse.applyTo(worldRay)
-// Hit transform : rec.point  = forward.applyToPoint(localPoint)
-//                rec.normal = (forward.applyToNormal(localNormal)).normalize()
-//                             — i.e. (M^-1)^T * n, same rule as PrimitiveNode.
-// AABB          : transform all 8 corners of the child's local AABB.
-//                 If the child's bounds are infinite (plane etc.) the infinite
-//                 AABB is passed through unchanged — the BVH partition in
-//                 SceneBuilder::build() will route it to the linear GroupNode.
-//
-// Ticket: T4.5.
-
 #ifndef RAYTRACER_CORE_TRANSFORMNODE_HPP
 #define RAYTRACER_CORE_TRANSFORMNODE_HPP
 
@@ -41,15 +21,14 @@ public:
 
     bool intersect(const Ray& ray, HitRecord& rec) const override
     {
-        // Transform ray to group-local (object) space.
         Ray local       = ray;
         local.origin    = inverseTransform_.applyToPoint(ray.origin);
         local.direction = inverseTransform_.applyToDirection(ray.direction);
 
         if (!child_->intersect(local, rec)) return false;
 
-        // Transform hit back to world space.
         rec.point          = transform_.applyToPoint(rec.point);
+        // Normal transform: (M^-1)^T · n.
         const Vector3 wn   = transform_.applyToNormal(rec.normal);
         const double  len  = wn.length();
         if (len > 1e-10) rec.normal = wn / len;
@@ -60,7 +39,7 @@ public:
     AABB bounds() const override
     {
         const AABB local = child_->bounds();
-        if (!local.isFinite()) return local;  // infinite child — pass through
+        if (!local.isFinite()) return local;
 
         AABB world{};
         for (int i = 0; i < 8; ++i) {

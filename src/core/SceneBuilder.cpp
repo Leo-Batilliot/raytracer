@@ -1,5 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-
 #include "core/SceneBuilder.hpp"
 
 #include <utility>
@@ -70,9 +68,8 @@ Scene SceneBuilder::build()
     if (root_) {
         scene.root_ = std::move(root_);
     } else {
-        // Partition: unbounded primitives (planes, sky domes) cannot be
-        // sorted by centroid median — they cause NaN in BVHNode::build.
-        // Keep them in a linear GroupNode tested alongside the BVH.
+        // Unbounded primitives (planes) cannot be sorted by centroid —
+        // keep them in a linear GroupNode alongside the BVH.
         std::vector<std::shared_ptr<INode>> finite, infinite;
         for (auto& n : prims_) {
             if (n->bounds().isFinite())

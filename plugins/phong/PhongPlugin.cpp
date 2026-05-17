@@ -1,9 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Phong material plugin (T4.1).
-// Implements the Phong reflection model:
-//   I = ka*Ia*albedo + kd*(N·L)*Id*albedo + ks*(R·V)^n*Is
-//
 // Config block:
 //   type      = "phong";
 //   color     = { r = 0.8; g = 0.2; b = 0.2; };  // diffuse albedo
@@ -29,10 +23,6 @@ float readFloat(const libconfig::Setting& s)
     return static_cast<float>(static_cast<double>(s));
 }
 
-// ----------------------------------------------------------------
-// PhongMaterial
-// ----------------------------------------------------------------
-
 class PhongMaterial final : public rt::IMaterial {
 public:
     PhongMaterial(rt::Color albedo, rt::Color specCol,
@@ -55,15 +45,11 @@ public:
 
 private:
     rt::Color albedo_;
-    rt::Color specCol_;  // ks × highlight colour (pre-multiplied)
+    rt::Color specCol_;
     float     ka_;
     float     kd_;
     float     shininess_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {
@@ -77,7 +63,6 @@ void* create(const libconfig::Setting& cfg)
         const float ks = cfg.exists("ks")
             ? readFloat(cfg["ks"]) : 0.5f;
 
-        // Specular highlight colour (default white, scaled by ks).
         rt::Color specCol{ks, ks, ks};
         if (cfg.exists("specular")) {
             specCol = rt::Color{

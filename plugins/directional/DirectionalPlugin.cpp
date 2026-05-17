@@ -1,14 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Directional light plugin (T1.4).
-// Models an infinitely distant light source (sun): constant direction and
-// radiance everywhere; no distance attenuation; shadow rays run to +inf.
-//
-// Config `direction` is the vector the light is shining TOWARD (i.e. the
-// direction photons travel).  sample() returns the negated direction so
-// the Lambert dot-product in the renderer gets a vector pointing FROM the
-// surface TOWARD the light (per ILight contract).
-
 #include <limits>
 
 #include <libconfig.h++>
@@ -32,13 +21,9 @@ double readDouble(const libconfig::Setting& s)
     return static_cast<double>(s);
 }
 
-// ----------------------------------------------------------------
-// DirectionalLight
-// ----------------------------------------------------------------
-
 class DirectionalLight final : public rt::ILight {
 public:
-    // toLight: unit vector pointing FROM scene TOWARD the light source.
+    // toLight: unit vector from scene toward the light source.
     DirectionalLight(rt::Vector3 toLight, rt::Color radiance)
         : toLight_(toLight), radiance_(radiance)
     {
@@ -58,15 +43,10 @@ private:
     rt::Color   radiance_;
 };
 
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
-
 void* create(const libconfig::Setting& cfg)
 {
     try {
-        // `direction` in config = direction light shines toward scene.
-        // We negate it to get the vector from surface toward light.
+        // `direction` = direction light shines toward scene; negate for surface→light.
         const rt::Vector3 toward{
             readDouble(cfg["direction"]["x"]),
             readDouble(cfg["direction"]["y"]),

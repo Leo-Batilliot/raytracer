@@ -1,18 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// BVHNode: binary bounding volume hierarchy node (T3.3).
-//
-// Build  — BVHNode::build(nodes) splits by centroid median on the longest
-//           axis, recursing until each leaf holds one INode.
-// Query  — intersect() rejects the whole subtree via AABB::intersects()
-//           before descending, shrinking tMax after the first child hit so
-//           the second child is only tested for strictly closer geometry.
-//
-// Complexity: O(N log N) build, O(log N) average query (vs O(N) GroupNode).
-// The existing INode interface is unchanged — BVHNode is a drop-in.
-//
-// Ticket: T3.3.
-
 #ifndef RAYTRACER_CORE_BVHNODE_HPP
 #define RAYTRACER_CORE_BVHNODE_HPP
 
@@ -28,8 +13,7 @@ namespace rt {
 
 class BVHNode final : public INode {
 public:
-    // Build a BVH over `nodes`. Returns nullptr if the list is empty,
-    // the single node if size == 1, or a BVHNode tree otherwise.
+    // Returns nullptr if empty, the single node if size == 1, or a tree otherwise.
     static std::shared_ptr<INode>
     build(std::vector<std::shared_ptr<INode>> nodes);
 
@@ -39,14 +23,13 @@ public:
 
         bool hit = false;
 
-        // Test left child; if hit, record it.
         HitRecord tmp;
         if (left_ && left_->intersect(ray, tmp)) {
             hit = true;
             rec  = tmp;
         }
 
-        // Test right child with tMax shrunk to the left's hit distance.
+        // Shrink tMax to the left hit so the right child only wins if closer.
         Ray trimmed = ray;
         if (hit) trimmed.tMax = rec.t;
         if (right_ && right_->intersect(trimmed, tmp)) {
@@ -74,15 +57,13 @@ private:
     AABB                   bounds_;
 };
 
-// ─── build ────────────────────────────────────────────────────────────────
-
 inline std::shared_ptr<INode>
 BVHNode::build(std::vector<std::shared_ptr<INode>> nodes)
 {
     if (nodes.empty()) return nullptr;
     if (nodes.size() == 1) return nodes[0];
 
-    // Compute the bounding box of all centroids to find the split axis.
+    // Split by centroid median on the longest axis.
     AABB centroidBounds;
     for (const auto& n : nodes) {
         const AABB b = n->bounds();
@@ -93,7 +74,6 @@ BVHNode::build(std::vector<std::shared_ptr<INode>> nodes)
         });
     }
 
-    // Choose the axis with the largest centroid spread.
     const double extX = centroidBounds.max.x - centroidBounds.min.x;
     const double extY = centroidBounds.max.y - centroidBounds.min.y;
     const double extZ = centroidBounds.max.z - centroidBounds.min.z;
@@ -102,7 +82,6 @@ BVHNode::build(std::vector<std::shared_ptr<INode>> nodes)
     if (extY > extX) axis = 1;
     if (extZ > (axis == 0 ? extX : extY)) axis = 2;
 
-    // Sort by centroid on that axis.
     std::sort(nodes.begin(), nodes.end(),
         [axis](const std::shared_ptr<INode>& a,
                const std::shared_ptr<INode>& b) {
@@ -117,12 +96,10 @@ BVHNode::build(std::vector<std::shared_ptr<INode>> nodes)
             return ca < cb;
         });
 
-    // Split at the median and recurse.
     const std::size_t mid = nodes.size() / 2;
     auto left  = build({nodes.begin(), nodes.begin() + mid});
     auto right = build({nodes.begin() + mid, nodes.end()});
 
-    // Union AABB of both children.
     AABB b;
     if (left)  b = b.merged(left->bounds());
     if (right) b = b.merged(right->bounds());

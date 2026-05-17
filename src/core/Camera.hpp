@@ -1,18 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Camera: pinhole model (T0.13).
-//
-// Precomputes a world-space virtual screen from CameraConfig at
-// construction time so generateRay() is a pure arithmetic hot path.
-//
-// Screen parameterisation (at distance 1 along -w from origin):
-//   lowerLeft_  : world position of the screen's bottom-left corner
-//   horizontal_ : world vector spanning the full screen width  (left→right)
-//   vertical_   : world vector spanning the full screen height (bottom→top)
-//
-// Pixel convention: (0,0) is top-left; y increases downward.
-// generateRay() samples at pixel centre (px+0.5, py+0.5).
-
 #ifndef RAYTRACER_CORE_CAMERA_HPP
 #define RAYTRACER_CORE_CAMERA_HPP
 
@@ -30,8 +15,6 @@ public:
     Ray generateRay(int px, int py) const noexcept;
 
     // Continuous version: samples at the exact sub-pixel coordinate (px, py).
-    // Used by the antialiasing logic in Renderer::shadePixel().
-    // Caller is responsible for the offset (e.g. px + (sx+0.5)/N).
     Ray generateRay(double px, double py) const noexcept;
 
     int width()  const noexcept { return width_; }

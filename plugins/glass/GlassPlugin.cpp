@@ -1,15 +1,9 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Glass material plugin (T4.3).
-// Transparent dielectric: Snell's law refraction + Schlick Fresnel reflection.
-// The renderer (Renderer::shade) drives the actual ray recursion.
-//
 // Config block:
 //   type         = "glass";
 //   transparency = 0.98;              // 0 = opaque, 1 = fully transparent
 //   ior          = 1.5;               // index of refraction (glass ≈ 1.5, diamond ≈ 2.42)
 //   color        = { r g b };         // tint applied to transmitted rays (white = clear)
-//   // Optional weak surface highlight (glass surface sheen):
+//   // Optional surface highlight:
 //   ka           = 0.02;
 //   kd           = 0.05;
 //   ks           = 0.3;
@@ -30,10 +24,6 @@ float readFloat(const libconfig::Setting& s)
     return static_cast<float>(static_cast<double>(s));
 }
 
-// ----------------------------------------------------------------
-// GlassMaterial
-// ----------------------------------------------------------------
-
 class GlassMaterial final : public rt::IMaterial {
 public:
     GlassMaterial(rt::Color tint, rt::Color specCol,
@@ -45,7 +35,7 @@ public:
     {
     }
 
-    // shade() returns the tint color — the renderer multiplies it onto refracted rays.
+    // shade() returns the tint — renderer multiplies it onto refracted rays.
     rt::Color shade(const rt::ShadingContext& /*ctx*/) const override
     {
         return tint_;
@@ -67,10 +57,6 @@ private:
     float     transparency_;
     float     ior_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {

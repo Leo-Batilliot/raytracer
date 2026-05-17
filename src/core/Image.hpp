@@ -1,8 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Image: row-major pixel buffer in linear float space (T0.14).
-// PPMWriter converts to sRGB bytes at write time.
-
 #ifndef RAYTRACER_CORE_IMAGE_HPP
 #define RAYTRACER_CORE_IMAGE_HPP
 
@@ -12,6 +7,7 @@
 
 namespace rt {
 
+// Row-major pixel buffer in linear float space. PPMWriter converts to sRGB at write time.
 class Image {
 public:
     Image(int width, int height)

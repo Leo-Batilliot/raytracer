@@ -1,17 +1,3 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// File texture material plugin (T4.8).
-// Loads a PPM image (P3 ASCII or P6 binary, any maxval) and samples
-// it at the surface's UV coordinates with bilinear interpolation and
-// tiling (repeat wrapping). Supports UV scaling for tile density control.
-//
-// The UV coordinates come from ctx.hit.uv:
-//   - Sphere  : u ∈ [0,1] (azimuth), v ∈ [0,1] (polar, 0 = top)
-//   - Cylinder: u = azimuth [0,1], v = height [0,1]
-//   - Cone    : similar to cylinder
-//   - Plane   : u = dot(point, tangent), v = dot(point, bitangent) in world
-//               units — use scale_u / scale_v to control tile density.
-//
 // Config block:
 //   type    = "texture";
 //   file    = "textures/brick.ppm";  // path relative to cwd
@@ -21,8 +7,6 @@
 //   kd      = 0.80;  // diffuse  (default 0.80)
 //   ks      = 0.10;  // specular (default 0.10)
 //   shininess = 16.0;
-//
-// Ticket: T4.8.
 
 #include <algorithm>
 #include <cctype>
@@ -38,10 +22,6 @@
 
 namespace {
 
-// ----------------------------------------------------------------
-// PPM image loader + bilinear sampler
-// ----------------------------------------------------------------
-
 class TextureImage {
 public:
     bool load(const std::string& path)
@@ -53,7 +33,6 @@ public:
         f >> magic;
         if (magic != "P3" && magic != "P6") return false;
 
-        // Skip comment lines and whitespace before reading integers.
         auto skip = [&]() {
             while (f) {
                 int c = f.peek();
@@ -66,7 +45,7 @@ public:
         skip(); int w; f >> w;
         skip(); int h; f >> h;
         skip(); int maxval; f >> maxval;
-        f.get();  // consume the single whitespace that precedes pixel data
+        f.get();
 
         if (w <= 0 || h <= 0 || maxval <= 0) return false;
 
@@ -96,14 +75,12 @@ public:
 
     bool empty() const { return pixels_.empty(); }
 
-    // Bilinear sample with tiling (UV wrapping).
+    // Bilinear sample with tiling (UV repeat wrapping).
     rt::Color sample(float u, float v) const
     {
-        // Tile: wrap to [0, 1) by subtracting floor.
         u -= std::floor(u);
         v -= std::floor(v);
 
-        // Map to pixel space [0, w-1] × [0, h-1].
         const float px = u * static_cast<float>(width_  - 1);
         const float py = v * static_cast<float>(height_ - 1);
 
@@ -120,7 +97,6 @@ public:
         const rt::Color c01 = pixels_[y1 * width_ + x0];
         const rt::Color c11 = pixels_[y1 * width_ + x1];
 
-        // Bilinear interpolation.
         const rt::Color top    = c00 * (1.0f - dx) + c10 * dx;
         const rt::Color bottom = c01 * (1.0f - dx) + c11 * dx;
         return top * (1.0f - dy) + bottom * dy;
@@ -131,10 +107,6 @@ private:
     int height_ = 0;
     std::vector<rt::Color> pixels_;
 };
-
-// ----------------------------------------------------------------
-// TextureMaterial
-// ----------------------------------------------------------------
 
 class TextureMaterial final : public rt::IMaterial {
 public:
@@ -169,10 +141,6 @@ private:
     rt::Color    specCol_;
 };
 
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
-
 float readFloat(const libconfig::Setting& s)
 {
     if (s.getType() == libconfig::Setting::TypeInt)
@@ -188,7 +156,6 @@ void* create(const libconfig::Setting& cfg)
 
         TextureImage img;
         if (!img.load(path)) {
-            // load() failed — warn via stderr, return null
             return nullptr;
         }
 

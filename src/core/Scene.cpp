@@ -1,8 +1,6 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-
 #include "core/Scene.hpp"
 
-#include "interfaces/IMaterial.hpp"  // full def needed by ~shared_ptr<IMaterial>
+#include "interfaces/IMaterial.hpp"
 
 namespace rt {
 

@@ -1,14 +1,8 @@
-// Raytracer — Epitech G-OOP-400-LIL-4-1-raytracer-16
-//
-// Mirror material plugin (T4.2).
-// Reflective surface: blends direct shading with a reflected secondary ray.
-// The renderer handles the ray recursion (see Renderer::shade, kMaxBounces=5).
-//
 // Config block:
 //   type         = "mirror";
 //   reflectivity = 0.9;               // 0 = matte, 1 = perfect mirror
 //   color        = { r g b };         // surface tint visible at grazing angles
-//   // Optional Phong highlight on the surface itself:
+//   // Optional Phong highlight:
 //   ks           = 0.5;
 //   shininess    = 128.0;
 //   ka           = 0.05;
@@ -28,10 +22,6 @@ float readFloat(const libconfig::Setting& s)
         return static_cast<float>(static_cast<int>(s));
     return static_cast<float>(static_cast<double>(s));
 }
-
-// ----------------------------------------------------------------
-// MirrorMaterial
-// ----------------------------------------------------------------
 
 class MirrorMaterial final : public rt::IMaterial {
 public:
@@ -63,10 +53,6 @@ private:
     float     shininess_;
     float     reflectivity_;
 };
-
-// ----------------------------------------------------------------
-// Plugin factory
-// ----------------------------------------------------------------
 
 void* create(const libconfig::Setting& cfg)
 {
