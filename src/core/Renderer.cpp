@@ -17,8 +17,8 @@
 
 namespace rt {
 
-Renderer::Renderer(const Scene& scene, const Camera& camera)
-    : scene_(scene), camera_(camera)
+Renderer::Renderer(const Scene& scene, const Camera& camera, AASetting aa)
+    : scene_(scene), camera_(camera), aa_(aa)
 {
 }
 
@@ -156,11 +156,66 @@ Color Renderer::shade(const Ray& ray, int depth) const
     return color;
 }
 
+// ----------------------------------------------------------------
+// Anti-aliasing helpers (T4.9)
+// ----------------------------------------------------------------
+
+Color Renderer::uniformSample(int px, int py, int n) const
+{
+    Color sum{};
+    for (int sy = 0; sy < n; ++sy) {
+        for (int sx = 0; sx < n; ++sx) {
+            const double ox = (sx + 0.5) / n;
+            const double oy = (sy + 0.5) / n;
+            sum = sum + shade(camera_.generateRay(px + ox, py + oy));
+        }
+    }
+    return sum / static_cast<float>(n * n);
+}
+
+Color Renderer::shadePixel(int px, int py) const
+{
+    // No AA: single ray at pixel centre.
+    if (aa_.samples <= 1 && !aa_.adaptive)
+        return shade(camera_.generateRay(px, py));
+
+    // Uniform supersampling (T4.9 basic).
+    if (!aa_.adaptive)
+        return uniformSample(px, py, aa_.samples);
+
+    // Adaptive supersampling (T4.9 adaptive):
+    // Start with 2×2 (4 samples). If any sample deviates from the mean
+    // by more than aa_.threshold, upgrade to max(aa_.samples, 3)×… .
+
+    const Color c00 = shade(camera_.generateRay(px + 0.25, py + 0.25));
+    const Color c10 = shade(camera_.generateRay(px + 0.75, py + 0.25));
+    const Color c01 = shade(camera_.generateRay(px + 0.25, py + 0.75));
+    const Color c11 = shade(camera_.generateRay(px + 0.75, py + 0.75));
+
+    const Color mean = (c00 + c10 + c01 + c11) * 0.25f;
+
+    // Max per-channel deviation from mean across the 4 samples.
+    auto diff = [](const Color& a, const Color& b) {
+        return std::max({std::abs(a.r - b.r),
+                         std::abs(a.g - b.g),
+                         std::abs(a.b - b.b)});
+    };
+    const float maxDev = std::max({diff(mean, c00), diff(mean, c10),
+                                   diff(mean, c01), diff(mean, c11)});
+
+    if (maxDev <= aa_.threshold)
+        return mean;  // Flat area: 4 samples suffice.
+
+    // High variance (edge/boundary): full N×N refinement.
+    const int n = std::max(aa_.samples, 3);
+    return uniformSample(px, py, n);
+}
+
 void Renderer::renderTile(int x0, int y0, int x1, int y1, Image& img) const
 {
     for (int y = y0; y < y1; ++y) {
         for (int x = x0; x < x1; ++x) {
-            img.at(x, y) = shade(camera_.generateRay(x, y));
+            img.at(x, y) = shadePixel(x, y);
         }
     }
 }

@@ -96,12 +96,13 @@ void runScene(const std::filesystem::path& scenePath)
     parser.parsePrimitives(builder, loader);
     parser.parseGroups(builder, loader);     // T4.5 — scene graph groups
     parser.parseLights(builder, loader);
+    const rt::AASetting aa = parser.parseAntialiasing();  // T4.9 — antialiasing
     rt::Scene scene = builder.build();
 
     // T0.14: render via the tile-based Renderer.
     rt::Camera camera(scene.camera());
     rt::Image img(camera.width(), camera.height());
-    rt::Renderer renderer(scene, camera);
+    rt::Renderer renderer(scene, camera, aa);
     renderer.renderAll(img);
     rt::PPMWriter::write(std::cout, img.width(), img.height(), img.pixels());
 }

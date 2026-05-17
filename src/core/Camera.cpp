@@ -26,14 +26,17 @@ Camera::Camera(const CameraConfig& cfg)
 
 Ray Camera::generateRay(int px, int py) const noexcept
 {
-    const double s = (px + 0.5) / width_;
-    const double t = 1.0 - (py + 0.5) / height_;  // flip y: image row 0 = top
+    return generateRay(px + 0.5, py + 0.5);
+}
 
-    // Screen point in world space, then direction from eye.
+Ray Camera::generateRay(double px, double py) const noexcept
+{
+    const double s = px / width_;
+    const double t = 1.0 - py / height_;  // flip y: image row 0 = top
+
     const Vector3 target = lowerLeft_ + s * horizontal_ + t * vertical_;
     const Vector3 rawDir = target - origin_;
 
-    // Safe normalization: for a valid camera config rawDir is never zero.
     const double len = rawDir.length();
     const Vector3 dir = (len > 0.0) ? rawDir / len : Vector3{0.0, 0.0, -1.0};
 

@@ -99,6 +99,26 @@ CameraConfig SceneParser::parseCamera() const
 }
 
 // ----------------------------------------------------------------
+// parseAntialiasing  (T4.9)
+// ----------------------------------------------------------------
+
+AASetting SceneParser::parseAntialiasing() const
+{
+    AASetting aa;
+    if (!config_.exists("antialiasing")) return aa;
+    const libconfig::Setting& s = config_.lookup("antialiasing");
+    if (s.exists("samples"))
+        aa.samples = static_cast<int>(s["samples"]);
+    if (s.exists("adaptive"))
+        aa.adaptive = static_cast<bool>(s["adaptive"]);
+    if (s.exists("threshold"))
+        aa.threshold = static_cast<float>(readScalar(s["threshold"]));
+    if (aa.samples < 1) aa.samples = 1;
+    if (aa.samples > 8) aa.samples = 8;
+    return aa;
+}
+
+// ----------------------------------------------------------------
 // buildPrimitiveList  (shared helper — T4.5)
 // ----------------------------------------------------------------
 

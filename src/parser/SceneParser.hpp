@@ -28,6 +28,7 @@
 
 #include <libconfig.h++>
 
+#include "core/AASetting.hpp"
 #include "core/CameraConfig.hpp"  // CameraConfig moved here in T0.11
 #include "core/SceneBuilder.hpp"
 #include "interfaces/INode.hpp"
@@ -51,6 +52,10 @@ public:
     // Reads the mandatory `camera` group. Throws:
     //   rt::InvalidConfigError — missing / wrong-typed field
     CameraConfig parseCamera() const;
+
+    // Reads the optional `antialiasing {}` block (T4.9).
+    // Returns default AASetting (1 sample, no adaptive) if absent.
+    AASetting parseAntialiasing() const;
 
     // Reads the optional `primitives` section and registers each
     // primitive with `builder` via the plugin registry `loader`.

@@ -26,7 +26,13 @@ class Camera {
 public:
     explicit Camera(const CameraConfig& cfg);
 
+    // Integer version: samples at pixel centre (px+0.5, py+0.5).
     Ray generateRay(int px, int py) const noexcept;
+
+    // Continuous version: samples at the exact sub-pixel coordinate (px, py).
+    // Used by the antialiasing logic in Renderer::shadePixel().
+    // Caller is responsible for the offset (e.g. px + (sx+0.5)/N).
+    Ray generateRay(double px, double py) const noexcept;
 
     int width()  const noexcept { return width_; }
     int height() const noexcept { return height_; }
