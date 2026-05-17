@@ -31,3 +31,4 @@ add_subdirectory(mirror)      # T4.2
 add_subdirectory(glass)         # T4.3
 add_subdirectory(checkerboard)  # T4.6
 add_subdirectory(perlin)        # T4.7
+add_subdirectory(texture)       # T4.8
