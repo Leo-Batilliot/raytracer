@@ -31,8 +31,4 @@ Testing/
 
 # === Remnant Markdown documentation ===
 *.md
-!PROJECT.md
-!PLAN.md
-!DOCUMENTATION.md
 !README.md
-!MATHS.md
