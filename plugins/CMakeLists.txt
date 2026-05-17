@@ -28,4 +28,5 @@ add_subdirectory(cylinder)    # T2.1
 add_subdirectory(cone)        # T2.2
 add_subdirectory(phong)       # T4.1
 add_subdirectory(mirror)      # T4.2
-add_subdirectory(glass)       # T4.3
+add_subdirectory(glass)         # T4.3
+add_subdirectory(checkerboard)  # T4.6
