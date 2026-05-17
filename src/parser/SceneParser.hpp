@@ -23,11 +23,14 @@
 #define RAYTRACER_PARSER_SCENEPARSER_HPP
 
 #include <filesystem>
+#include <memory>
+#include <vector>
 
 #include <libconfig.h++>
 
 #include "core/CameraConfig.hpp"  // CameraConfig moved here in T0.11
 #include "core/SceneBuilder.hpp"
+#include "interfaces/INode.hpp"
 #include "math/Vector3.hpp"
 
 namespace rt {
@@ -52,16 +55,23 @@ public:
     // Reads the optional `primitives` section and registers each
     // primitive with `builder` via the plugin registry `loader`.
     void parsePrimitives(SceneBuilder& builder,
-                         const PluginLoader& loader) const;
+        const PluginLoader& loader) const;
+
+    // Reads the optional `groups` section (T4.5 — scene graph).
+    // Each group entry has an optional transform (translate + rotate) and a
+    // `children` sub-section using the same primitive schema as `primitives`.
+    // Children are wrapped in a TransformNode whose transform is the group's.
+    void parseGroups(SceneBuilder& builder,
+        const PluginLoader& loader) const;
 
     // Reads the optional `lights` section and registers each light.
     void parseLights(SceneBuilder& builder,
-                     const PluginLoader& loader) const;
+        const PluginLoader& loader) const;
 
     // Reads the optional `materials` group and registers each named material.
     // Each entry must have a `type` field matching a loaded Material plugin.
     void parseMaterials(SceneBuilder& builder,
-                        const PluginLoader& loader) const;
+        const PluginLoader& loader) const;
 
 private:
     // Read a 3-component sub-group {x, y, z} from a Setting.
@@ -69,6 +79,16 @@ private:
 
     // Read a scalar Setting that may be TypeInt or TypeFloat.
     static double readScalar(const libconfig::Setting& s);
+
+    // Build PrimitiveNodes from parent[key] (plugin kind = `kind`) and
+    // append them to `nodes`. Uses `matLookup` only for findMaterial().
+    // Shared between parsePrimitives() and parseGroups().
+    void buildPrimitiveList(const libconfig::Setting& parent,
+        const char* key,
+        const char* kind,
+        const SceneBuilder& matLookup,
+        const PluginLoader& loader,
+        std::vector<std::shared_ptr<INode>>& nodes) const;
 
     libconfig::Config config_;
 };

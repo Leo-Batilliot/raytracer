@@ -32,6 +32,12 @@ SceneBuilder& SceneBuilder::addPrimitive(std::shared_ptr<IPrimitive> prim,
     return *this;
 }
 
+SceneBuilder& SceneBuilder::addNode(std::shared_ptr<INode> node)
+{
+    prims_.push_back(std::move(node));
+    return *this;
+}
+
 const IMaterial* SceneBuilder::findMaterial(std::string_view name) const
 {
     auto it = materials_.find(std::string(name));

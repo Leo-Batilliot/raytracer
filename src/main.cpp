@@ -94,6 +94,7 @@ void runScene(const std::filesystem::path& scenePath)
     builder.setCamera(parser.parseCamera());
     parser.parseMaterials(builder, loader);
     parser.parsePrimitives(builder, loader);
+    parser.parseGroups(builder, loader);     // T4.5 — scene graph groups
     parser.parseLights(builder, loader);
     rt::Scene scene = builder.build();
 

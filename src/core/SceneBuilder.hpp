@@ -56,6 +56,11 @@ public:
                                const IMaterial* mat             = nullptr,
                                Transform        transform        = Transform::identity());
 
+    // Add a pre-built INode (e.g. a TransformNode wrapping a group of primitives)
+    // directly to the scene. Participates in the same BVH/infinite partition
+    // as primitives added via addPrimitive(). Used by T4.5 scene-graph groups.
+    SceneBuilder& addNode(std::shared_ptr<INode> node);
+
     // Register a material under a scene-unique name.
     // The name is used in the .cfg file to associate a material to
     // a primitive.  Duplicate names replace the previous entry

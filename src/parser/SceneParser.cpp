@@ -5,10 +5,14 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <numbers>
 
 #include "core/Exceptions.hpp"
+#include "core/GroupNode.hpp"
+#include "core/PrimitiveNode.hpp"
+#include "core/TransformNode.hpp"
 #include "interfaces/ILight.hpp"
 #include "interfaces/IMaterial.hpp"
 #include "interfaces/IPrimitive.hpp"
@@ -95,82 +99,150 @@ CameraConfig SceneParser::parseCamera() const
 }
 
 // ----------------------------------------------------------------
+// buildPrimitiveList  (shared helper — T4.5)
+// ----------------------------------------------------------------
+
+void SceneParser::buildPrimitiveList(const libconfig::Setting& parent,
+    const char* key,
+    const char* kind,
+    const SceneBuilder& matLookup,
+    const PluginLoader& loader,
+    std::vector<std::shared_ptr<INode>>& nodes) const
+{
+    if (!parent.exists(key)) return;
+
+    const libconfig::Setting& list = parent[key];
+    const PluginDescriptor* desc   = loader.find(PluginKind::Primitive, kind);
+    if (!desc) {
+        std::cerr << "raytracer: warning: " << kind
+            << " plugin not loaded — skipping " << key << " section\n";
+        return;
+    }
+
+    for (int i = 0, n = list.getLength(); i < n; ++i) {
+        const libconfig::Setting& entry = list[i];
+        void* raw = desc->create(entry);
+        if (!raw) {
+            std::cerr << "raytracer: warning: " << kind << '[' << i
+                << "]: create() failed — skipping\n";
+            continue;
+        }
+        auto prim = std::shared_ptr<IPrimitive>(
+            static_cast<IPrimitive*>(raw),
+            [desc](IPrimitive* p) { desc->destroy(p); });
+
+        // Optional material reference.
+        const IMaterial* mat = nullptr;
+        if (entry.exists("material")) {
+            const std::string matName = static_cast<const char*>(entry["material"]);
+            mat = matLookup.findMaterial(matName);
+            if (!mat)
+                std::cerr << "raytracer: warning: " << kind << '[' << i
+                    << "]: material '" << matName << "' not found — ignored\n";
+        }
+
+        // Optional rotation (degrees per axis, applied X → Y → Z).
+        Transform rotation = Transform::identity();
+        if (entry.exists("rotate")) {
+            constexpr double kDeg2Rad = std::numbers::pi / 180.0;
+            const libconfig::Setting& rot = entry["rotate"];
+            if (rot.exists("x"))
+                rotation = Transform::rotationX(readScalar(rot["x"]) * kDeg2Rad);
+            if (rot.exists("y"))
+                rotation = Transform::rotationY(readScalar(rot["y"]) * kDeg2Rad) * rotation;
+            if (rot.exists("z"))
+                rotation = Transform::rotationZ(readScalar(rot["z"]) * kDeg2Rad) * rotation;
+        }
+
+        // Optional translation (applied after rotation).
+        Transform translation = Transform::identity();
+        if (entry.exists("translate")) {
+            const Vector3 t = readVec3(entry["translate"]);
+            translation = Transform::translation(t.x, t.y, t.z);
+        }
+
+        nodes.push_back(std::make_shared<PrimitiveNode>(
+            std::move(prim), mat, translation * rotation));
+    }
+}
+
+// ----------------------------------------------------------------
 // parsePrimitives
 // ----------------------------------------------------------------
 
 void SceneParser::parsePrimitives(SceneBuilder& builder,
-                                  const PluginLoader& loader) const
+    const PluginLoader& loader) const
 {
     if (!config_.exists("primitives")) return;
 
     const libconfig::Setting& prims = config_.lookup("primitives");
 
-    auto loadList = [&](const char* key, const char* kind) {
-        if (!prims.exists(key)) return;
-        const libconfig::Setting& list = prims[key];
-        const PluginDescriptor*  desc  = loader.find(PluginKind::Primitive, kind);
-        if (!desc) {
-            std::cerr << "raytracer: warning: " << kind
-                      << " plugin not loaded — skipping " << key << " section\n";
-            return;
+    std::vector<std::shared_ptr<INode>> nodes;
+    buildPrimitiveList(prims, "spheres",   "sphere",   builder, loader, nodes);
+    buildPrimitiveList(prims, "planes",    "plane",    builder, loader, nodes);
+    buildPrimitiveList(prims, "cylinders", "cylinder", builder, loader, nodes);
+    buildPrimitiveList(prims, "cones",     "cone",     builder, loader, nodes);
+
+    for (auto& n : nodes)
+        builder.addNode(std::move(n));
+}
+
+// ----------------------------------------------------------------
+// parseGroups  (T4.5 — scene graph)
+// ----------------------------------------------------------------
+
+void SceneParser::parseGroups(SceneBuilder& builder,
+    const PluginLoader& loader) const
+{
+    if (!config_.exists("groups")) return;
+
+    const libconfig::Setting& groups = config_.lookup("groups");
+
+    for (int i = 0, n = groups.getLength(); i < n; ++i) {
+        const libconfig::Setting& entry = groups[i];
+
+        // Parse group transform (translate + rotate, same convention as primitives).
+        Transform rotation = Transform::identity();
+        if (entry.exists("rotate")) {
+            constexpr double kDeg2Rad = std::numbers::pi / 180.0;
+            const libconfig::Setting& rot = entry["rotate"];
+            if (rot.exists("x"))
+                rotation = Transform::rotationX(readScalar(rot["x"]) * kDeg2Rad);
+            if (rot.exists("y"))
+                rotation = Transform::rotationY(readScalar(rot["y"]) * kDeg2Rad) * rotation;
+            if (rot.exists("z"))
+                rotation = Transform::rotationZ(readScalar(rot["z"]) * kDeg2Rad) * rotation;
         }
-        for (int i = 0, n = list.getLength(); i < n; ++i) {
-            const libconfig::Setting& entry = list[i];
-            void* raw = desc->create(entry);
-            if (!raw) {
-                std::cerr << "raytracer: warning: " << kind << '[' << i
-                          << "]: create() failed — skipping\n";
-                continue;
-            }
-            auto prim = std::shared_ptr<IPrimitive>(
-                static_cast<IPrimitive*>(raw),
-                [desc](IPrimitive* p) { desc->destroy(p); });
-
-            // Optional material reference.
-            const IMaterial* mat = nullptr;
-            if (entry.exists("material")) {
-                const std::string matName =
-                    static_cast<const char*>(entry["material"]);
-                mat = builder.findMaterial(matName);
-                if (!mat) {
-                    std::cerr << "raytracer: warning: " << kind << '[' << i
-                              << "]: material '" << matName
-                              << "' not found — ignored\n";
-                }
-            }
-
-            // Optional rotation (degrees per axis, applied X → Y → Z).
-            // T2.3: rotate = { x = 0.0; y = 45.0; z = 0.0; }
-            Transform rotation = Transform::identity();
-            if (entry.exists("rotate")) {
-                constexpr double kDeg2Rad = std::numbers::pi / 180.0;
-                const libconfig::Setting& rot = entry["rotate"];
-                if (rot.exists("x"))
-                    rotation = Transform::rotationX(readScalar(rot["x"]) * kDeg2Rad);
-                if (rot.exists("y"))
-                    rotation = Transform::rotationY(readScalar(rot["y"]) * kDeg2Rad)
-                               * rotation;
-                if (rot.exists("z"))
-                    rotation = Transform::rotationZ(readScalar(rot["z"]) * kDeg2Rad)
-                               * rotation;
-            }
-
-            // Optional translation (applied after rotation).
-            Transform translation = Transform::identity();
-            if (entry.exists("translate")) {
-                const Vector3 t = readVec3(entry["translate"]);
-                translation = Transform::translation(t.x, t.y, t.z);
-            }
-
-            // Compose: Translation * Rotation (rotate first, then translate).
-            builder.addPrimitive(std::move(prim), mat, translation * rotation);
+        Transform translation = Transform::identity();
+        if (entry.exists("translate")) {
+            const Vector3 t = readVec3(entry["translate"]);
+            translation = Transform::translation(t.x, t.y, t.z);
         }
-    };
+        const Transform groupTransform = translation * rotation;
 
-    loadList("spheres",    "sphere");    // T1.1
-    loadList("planes",     "plane");     // T1.2
-    loadList("cylinders",  "cylinder");  // T2.1
-    loadList("cones",      "cone");      // T2.2
+        // Parse children (same primitive schema as the `primitives` section).
+        if (!entry.exists("children")) {
+            std::cerr << "raytracer: warning: group[" << i
+                << "]: no 'children' section — skipping\n";
+            continue;
+        }
+        const libconfig::Setting& children = entry["children"];
+
+        std::vector<std::shared_ptr<INode>> childNodes;
+        buildPrimitiveList(children, "spheres",   "sphere",   builder, loader, childNodes);
+        buildPrimitiveList(children, "planes",    "plane",    builder, loader, childNodes);
+        buildPrimitiveList(children, "cylinders", "cylinder", builder, loader, childNodes);
+        buildPrimitiveList(children, "cones",     "cone",     builder, loader, childNodes);
+
+        if (childNodes.empty()) continue;
+
+        // Assemble: wrap children in a GroupNode, then apply the group transform.
+        auto group = std::make_shared<GroupNode>();
+        for (auto& child : childNodes)
+            group->addChild(std::move(child));
+
+        builder.addNode(std::make_shared<TransformNode>(std::move(group), groupTransform));
+    }
 }
 
 // ----------------------------------------------------------------
@@ -178,7 +250,7 @@ void SceneParser::parsePrimitives(SceneBuilder& builder,
 // ----------------------------------------------------------------
 
 void SceneParser::parseLights(SceneBuilder& builder,
-                               const PluginLoader& loader) const
+    const PluginLoader& loader) const
 {
     if (!config_.exists("lights")) return;
 
@@ -187,17 +259,17 @@ void SceneParser::parseLights(SceneBuilder& builder,
     auto loadList = [&](const char* key, const char* kind) {
         if (!lights.exists(key)) return;
         const libconfig::Setting& list = lights[key];
-        const PluginDescriptor*  desc  = loader.find(PluginKind::Light, kind);
+        const PluginDescriptor* desc   = loader.find(PluginKind::Light, kind);
         if (!desc) {
             std::cerr << "raytracer: warning: " << kind
-                      << " light plugin not loaded — skipping " << key << '\n';
+                << " light plugin not loaded — skipping " << key << '\n';
             return;
         }
         for (int i = 0, n = list.getLength(); i < n; ++i) {
             void* raw = desc->create(list[i]);
             if (!raw) {
                 std::cerr << "raytracer: warning: " << kind << '[' << i
-                          << "]: create() failed — skipping\n";
+                    << "]: create() failed — skipping\n";
                 continue;
             }
             auto* light = static_cast<ILight*>(raw);
@@ -215,7 +287,7 @@ void SceneParser::parseLights(SceneBuilder& builder,
 // ----------------------------------------------------------------
 
 void SceneParser::parseMaterials(SceneBuilder& builder,
-                                  const PluginLoader& loader) const
+    const PluginLoader& loader) const
 {
     if (!config_.exists("materials")) return;
 
@@ -227,7 +299,7 @@ void SceneParser::parseMaterials(SceneBuilder& builder,
 
         if (!entry.exists("type")) {
             std::cerr << "raytracer: warning: material '" << name
-                      << "' has no 'type' field — skipping\n";
+                << "' has no 'type' field — skipping\n";
             continue;
         }
 
@@ -237,14 +309,14 @@ void SceneParser::parseMaterials(SceneBuilder& builder,
             loader.find(PluginKind::Material, type);
         if (!desc) {
             std::cerr << "raytracer: warning: material type '" << type
-                      << "' not loaded — skipping '" << name << "'\n";
+                << "' not loaded — skipping '" << name << "'\n";
             continue;
         }
 
         void* raw = desc->create(entry);
         if (!raw) {
             std::cerr << "raytracer: warning: material '" << name
-                      << "': create() failed — skipping\n";
+                << "': create() failed — skipping\n";
             continue;
         }
 
