@@ -300,6 +300,7 @@ void SceneParser::parseLights(SceneBuilder& builder,
 
     loadList("ambient",     "ambient");     // T1.3
     loadList("directional", "directional"); // T1.4
+    loadList("point",       "point");       // T4.10
 }
 
 // ----------------------------------------------------------------

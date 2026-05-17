@@ -32,3 +32,4 @@ add_subdirectory(glass)         # T4.3
 add_subdirectory(checkerboard)  # T4.6
 add_subdirectory(perlin)        # T4.7
 add_subdirectory(texture)       # T4.8
+add_subdirectory(point_light)   # T4.10
