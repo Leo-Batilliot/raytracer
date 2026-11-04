@@ -1,5 +1,7 @@
 # Raytracer — G-OOP-400
 
+![Demo](docs/demo.gif)
+
 A modular raytracer written in C++20 for Epitech, built around a dynamic plugin system. Every primitive, light, and material is a separately compiled `.so` loaded at runtime — adding a new shape is one file and one CMake line.
 
 ---
